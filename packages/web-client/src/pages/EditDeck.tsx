@@ -24,7 +24,7 @@ import {
 import { Layout } from "../layouts/Layout";
 import axios, { AxiosError } from "axios";
 import type { Deck } from "@gi-tcg/typings";
-import { DEFAULT_ASSETS_MANAGER } from "@gi-tcg/assets-manager";
+import { staticDecode, staticEncode } from "@gi-tcg/assets-manager";
 import { useParams, useSearchParams } from "@solidjs/router";
 import { DeckBuilder } from "@gi-tcg/deck-builder";
 import "@gi-tcg/deck-builder/style.css";
@@ -109,7 +109,7 @@ export default function EditDeck() {
       return;
     }
     try {
-      const deck = DEFAULT_ASSETS_MANAGER.decode(input);
+      const deck = staticDecode(input);
       setDeckValue(deck);
       setDirty(true);
     } catch (e) {
@@ -123,7 +123,7 @@ export default function EditDeck() {
   const exportCode = async () => {
     try {
       const deck = deckValue();
-      const code = DEFAULT_ASSETS_MANAGER.encode(deck);
+      const code = staticEncode(deck);
       await copyShareCode(code, t);
     } catch (e) {
       if (e instanceof Error) {

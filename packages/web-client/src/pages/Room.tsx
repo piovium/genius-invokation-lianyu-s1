@@ -225,7 +225,7 @@ export default function Room() {
     };
     if (!playerIo()) {
       const [io, Ui] = createClient(payload.who, {
-        assetsManager: () => assetsManager(payload.config.gameVersion),
+        assetsManager,
         locale,
         onGiveUp,
         disableAction: !action,
