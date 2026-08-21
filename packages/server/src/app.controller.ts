@@ -22,9 +22,10 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { Public } from "./auth/auth.guard";
-import { CORE_VERSION, CURRENT_VERSION, VERSIONS } from "@gi-tcg/core";
+import { CORE_VERSION, CURRENT_VERSION } from "@gi-tcg/core";
 import simpleGit, { type LogResult } from "simple-git";
 import { redis } from "./redis";
+import { ASSETS_MANAGER_OPTIONS } from "./utils";
 
 const git = simpleGit();
 
@@ -62,10 +63,16 @@ export class AppController {
     const { latest } = await git.log({ maxCount: 1 }).catch(fallbackGitLog);
     return {
       revision: latest,
-      supportedGameVersions: VERSIONS,
+      supportedGameVersions: [CURRENT_VERSION],
       currentGameVersion: CURRENT_VERSION,
       coreVersion: CORE_VERSION,
     };
+  }
+
+  @Public()
+  @Get("/assetsManagerOptions")
+  getAssetsManagerOptions() {
+    return ASSETS_MANAGER_OPTIONS;
   }
 
   @Public()
