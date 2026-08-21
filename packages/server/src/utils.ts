@@ -15,10 +15,13 @@
 
 import type { Deck } from "@gi-tcg/typings";
 import {
+  AssetsManager,
   DEFAULT_ASSETS_MANAGER,
   type AnyData,
+  type AssetsManagerOption,
   type CharacterRawData,
   type EntityRawData,
+  type OverrideData,
 } from "@gi-tcg/assets-manager";
 import {
   IsInt,
@@ -28,7 +31,13 @@ import {
   validate,
   ValidationError,
 } from "class-validator";
-import { CURRENT_VERSION, VERSIONS, type Version } from "@gi-tcg/core";
+import {
+  createOfficialVersionResolver,
+  CURRENT_VERSION,
+  getVersionBehavior,
+  type Version,
+  type VersionBehavior,
+} from "@gi-tcg/core";
 import { compare as semverCompare } from "semver";
 import {
   plainToClass,
@@ -38,6 +47,8 @@ import {
 } from "class-transformer";
 import { createId as createCuid, isCuid } from "@paralleldrive/cuid2";
 import { BadRequestException } from "@nestjs/common";
+import DEPS from "@gi-tcg/data-code-analyzer";
+import { CustomDataLoader } from "@gi-tcg/custom-data-loader";
 
 export enum DeckVerificationErrorCode {
   SizeError = "SizeError",
@@ -55,7 +66,36 @@ export class DeckVerificationError extends Error {
   }
 }
 
-export const ASSETS_MANAGER = DEFAULT_ASSETS_MANAGER;
+const MATCH_CONFIG = (await fetch(
+  "https://piovium.github.io/lianyu-s1-data-config/config.json",
+).then((res) => res.json())) as {
+  overrides: OverrideData[];
+  versions: Record<string, Version>;
+  mods: string[];
+};
+export const versionResolver = createOfficialVersionResolver(
+  void 0,
+  MATCH_CONFIG.versions,
+  DEPS,
+);
+const customDataLoader = new CustomDataLoader();
+await customDataLoader.loadMod(...MATCH_CONFIG.mods);
+const [gameData, amOptions] = customDataLoader.done();
+
+export const ASSETS_MANAGER_OPTIONS: Partial<AssetsManagerOption> = {
+  ...amOptions,
+  language: "CHS",
+  overrideData: [...(amOptions.overrideData ?? []), ...MATCH_CONFIG.overrides],
+  version: versionResolver.versionMap,
+  defaultDeckCompatible: true,
+};
+export { gameData as GAME_DATA };
+export const GAME_VERSION_BEHAVIOR: VersionBehavior = {
+  ...getVersionBehavior("v7.0.0"),
+  discardMaxCostHandsAbortPreview: false,
+};
+
+export const ASSETS_MANAGER = new AssetsManager(ASSETS_MANAGER_OPTIONS);
 
 ASSETS_MANAGER.prepareForSync();
 
@@ -159,7 +199,7 @@ export async function verifyDeck(deck: Deck): Promise<Version> {
       versions.add(card.sinceVersion);
     }
   }
-  return maxVersion(versions);
+  return CURRENT_VERSION;
 }
 
 function maxVersion(versions: Iterable<string | null>): Version {
@@ -174,19 +214,8 @@ function maxVersion(versions: Iterable<string | null>): Version {
   }
 }
 
-export async function minimumRequiredVersionOfDeck({
-  characters,
-  cards,
-}: Deck): Promise<Version> {
-  return maxVersion(
-    await Promise.all(
-      [...characters, ...cards].map((p) =>
-        getData<CharacterRawData | EntityRawData>(p).then(
-          (d) => d?.sinceVersion ?? null,
-        ),
-      ),
-    ),
-  );
+export async function minimumRequiredVersionOfDeck(_: Deck): Promise<Version> {
+  return CURRENT_VERSION;
 }
 
 export function parseStringToInt({ value }: TransformFnParams): number {

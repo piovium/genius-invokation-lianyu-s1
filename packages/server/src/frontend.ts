@@ -17,6 +17,7 @@ import mime from "mime";
 import type { FastifyInstance, RouteHandlerMethod } from "fastify";
 import fastifyEtag from "@fastify/etag";
 import { IS_BETA, WEB_CLIENT_BASE_PATH } from "@gi-tcg/config";
+import { ASSETS_MANAGER_OPTIONS } from "./utils";
 
 const HTML_INJECTION_PLACEHOLDERS = {
   head: "<!-- server:head -->",
@@ -36,6 +37,14 @@ export function injectHtml(
         injections[position] ?? "",
       ),
     html,
+  );
+}
+
+function serializeForHtml(value: unknown): string {
+  return JSON.stringify(value).replace(
+    /[<\u2028\u2029]/g,
+    (character) =>
+      `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
   );
 }
 
@@ -67,6 +76,7 @@ export async function frontend(app: FastifyInstance) {
       Buffer.from(indexHtml!, "base64").toString(),
       {
         head: IS_BETA ? '<meta name="robots" content="noindex">' : "",
+        body: `<script id="assets-manager-options" type="application/json">${serializeForHtml(ASSETS_MANAGER_OPTIONS)}</script>`,
       },
     );
     const indexHtmlBuffer = Buffer.from(indexHtmlContent);

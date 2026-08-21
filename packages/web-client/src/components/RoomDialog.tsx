@@ -30,7 +30,6 @@ import { useNavigate } from "@solidjs/router";
 import { useAuth } from "../auth";
 import { useVersionContext } from "../App";
 import { useGuestDecks, useGuestInfo } from "../guest";
-import type { AssetsManager } from "@gi-tcg/assets-manager";
 import { useI18n } from "../i18n";
 
 function SelectableDeckInfo(
