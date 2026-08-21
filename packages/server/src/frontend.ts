@@ -17,6 +17,17 @@ import mime from "mime";
 import type { FastifyInstance, RouteHandlerMethod } from "fastify";
 import fastifyEtag from "@fastify/etag";
 import { WEB_CLIENT_BASE_PATH } from "@gi-tcg/config";
+import { ASSETS_MANAGER_OPTIONS } from "./utils";
+
+const ASSETS_MANAGER_OPTIONS_PROBE = "__ASSETS_MANAGER_OPTIONS__";
+
+function serializeForHtml(value: unknown): string {
+  return JSON.stringify(value).replace(
+    /[<\u2028\u2029]/g,
+    (character) =>
+      `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+}
 
 export async function frontend(app: FastifyInstance) {
   await app.register(fastifyEtag);
@@ -42,7 +53,16 @@ export async function frontend(app: FastifyInstance) {
       });
     }
 
-    const indexHtmlBuffer = Buffer.from(indexHtml!, "base64");
+    const indexHtmlTemplate = Buffer.from(indexHtml!, "base64").toString();
+    if (!indexHtmlTemplate.includes(ASSETS_MANAGER_OPTIONS_PROBE)) {
+      throw new Error("AssetsManager options probe not found in index.html");
+    }
+    const indexHtmlBuffer = Buffer.from(
+      indexHtmlTemplate.replace(
+        ASSETS_MANAGER_OPTIONS_PROBE,
+        serializeForHtml(ASSETS_MANAGER_OPTIONS),
+      ),
+    );
     const indexHtmlHandler: RouteHandlerMethod = (_req, reply) => {
       return reply
         .header("Cache-Control", "public, no-cache, must-revalidate")

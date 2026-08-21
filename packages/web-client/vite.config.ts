@@ -13,15 +13,60 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import unoCss from "unocss/vite";
 import solid from "vite-plugin-solid";
 import babel from "@rollup/plugin-babel";
-import { WEB_CLIENT_BASE_PATH } from "@gi-tcg/config";
+import { SERVER_HOST, WEB_CLIENT_BASE_PATH } from "@gi-tcg/config";
 import { readdirSync } from "node:fs";
 
 const AVATARS_BASE_PATH = "public/avatars";
 const AVATARS = [...readdirSync(AVATARS_BASE_PATH)];
+const ASSETS_MANAGER_OPTIONS_PROBE = "__ASSETS_MANAGER_OPTIONS__";
+
+function serializeForHtml(value: unknown): string {
+  return JSON.stringify(value).replace(
+    /[<\u2028\u2029]/g,
+    (character) =>
+      `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+}
+
+function injectAssetsManagerOptions(): Plugin {
+  let serializedOptions: string;
+  return {
+    name: "inject-assets-manager-options",
+    apply: "serve",
+    async configResolved() {
+      const serverHost = SERVER_HOST || "http://localhost:3000";
+      const endpoint = new URL(
+        `${WEB_CLIENT_BASE_PATH}api/assetsManagerOptions`,
+        serverHost,
+      );
+      let response: Response;
+      try {
+        response = await fetch(endpoint);
+      } catch (cause) {
+        throw new Error(
+          `Failed to fetch AssetsManager options from ${endpoint}. Is the server running?`,
+          { cause },
+        );
+      }
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch AssetsManager options from ${endpoint}: ${response.status} ${response.statusText}`,
+        );
+      }
+      serializedOptions = serializeForHtml(await response.json());
+    },
+    transformIndexHtml(html) {
+      if (!html.includes(ASSETS_MANAGER_OPTIONS_PROBE)) {
+        throw new Error("AssetsManager options probe not found in index.html");
+      }
+      return html.replace(ASSETS_MANAGER_OPTIONS_PROBE, serializedOptions);
+    },
+  };
+}
 
 export default defineConfig({
   esbuild: {
@@ -29,6 +74,7 @@ export default defineConfig({
   },
   base: WEB_CLIENT_BASE_PATH,
   plugins: [
+    injectAssetsManagerOptions(),
     unoCss(),
     solid(),
     babel({

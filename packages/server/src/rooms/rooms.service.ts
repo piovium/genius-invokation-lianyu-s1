@@ -32,7 +32,6 @@ import {
   type RpcRequest,
   serializeGameStateLog,
   CORE_VERSION,
-  VERSIONS,
   RpcResponse,
   CURRENT_VERSION,
   type Version,
@@ -40,7 +39,6 @@ import {
   setAsyncContext,
 } from "@gi-tcg/core";
 import { dispatchRpc, type Deck } from "@gi-tcg/typings";
-import getData from "@gi-tcg/data";
 import { flip } from "@gi-tcg/utils";
 import {
   BehaviorSubject,
@@ -57,7 +55,7 @@ import {
   mergeWith,
   takeUntil,
 } from "rxjs";
-import { createGuestId, DeckVerificationError, verifyDeck } from "../utils";
+import { createGuestId, DeckVerificationError, GAME_DATA, GAME_VERSION_BEHAVIOR, verifyDeck } from "../utils";
 import {
   MetricsService,
   type RoomMetricsSnapshot,
@@ -531,8 +529,8 @@ class Room {
       player1.setTimeoutConfig(this.config);
       state = InternalGame.createInitialState({
         decks: [player0.playerInfo.deck, player1.playerInfo.deck],
-        data: getData(this.config.gameVersion),
-        versionBehavior: this.config.gameVersion,
+        data: GAME_DATA,
+        versionBehavior: GAME_VERSION_BEHAVIOR,
         hostRelatedExecution: true,
         hostWho: this.hostWho,
       });
@@ -778,10 +776,7 @@ export class RoomsService {
     const roomConfig: CreateRoomConfig = {
       hostWho,
       randomSeed: params.randomSeed,
-      gameVersion:
-        typeof params.gameVersion === "number"
-          ? VERSIONS[params.gameVersion]!
-          : CURRENT_VERSION,
+      gameVersion: CURRENT_VERSION,
       initTotalActionTime: params.initTotalActionTime ?? 45,
       rerollTime: params.rerollTime ?? 40,
       roundTotalActionTime: params.roundTotalActionTime ?? 60,
