@@ -426,7 +426,7 @@ export class TournamentsService {
       game.match.mode === "UNRESTRICTED"
         ? await this.prisma.deck.findMany({ where: { ownerUserId: userId } })
         : await this.prisma.matchDeck.findMany({
-            where: { matchId: game.matchId!, userId, usable: true },
+            where: { matchId: game.matchId!, userId },
           });
     return {
       gameId,
@@ -792,6 +792,10 @@ export class TournamentsService {
       const count = await tx.matchDeck.count({ where: { matchId, userId } });
       if (match.event.deckLimit > 0 && count >= match.event.deckLimit)
         throw new ConflictException("COMPETITION_DECK_LIMIT_REACHED");
+      const duplicate = await tx.matchDeck.findFirst({
+        where: { matchId, userId, characterKey: key },
+      });
+      if (duplicate) throw new ConflictException("DUPLICATE_CHARACTER_SET");
       const created = await tx.matchDeck.create({
         data: {
           matchId,
