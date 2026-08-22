@@ -18,7 +18,6 @@ import {
   createContext,
   createResource,
   createSignal,
-  onMount,
   onCleanup,
   Resource,
   useContext,
@@ -26,7 +25,7 @@ import {
   lazy,
 } from "solid-js";
 import axios from "axios";
-import { useAuth } from "./auth";
+import { AuthProvider } from "./auth";
 
 const Home = lazy(() => import("./pages/Home"));
 const User = lazy(() => import("./pages/User"));
@@ -34,6 +33,17 @@ const Decks = lazy(() => import("./pages/Decks"));
 const EditDeck = lazy(() => import("./pages/EditDeck"));
 const Room = lazy(() => import("./pages/Room"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const LoginPage = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const TournamentGame = lazy(() => import("./pages/TournamentGame"));
+const AdminHome = lazy(() => import("./pages/admin/Home"));
+const AdminUsers = lazy(() => import("./pages/admin/Users"));
+const AdminEvents = lazy(() => import("./pages/admin/Events"));
+const AdminEventEditor = lazy(() => import("./pages/admin/EventEditor"));
+const AdminEvent = lazy(() => import("./pages/admin/Event"));
+const AdminMatch = lazy(() => import("./pages/admin/Match"));
+const AdminStatistics = lazy(() => import("./pages/admin/Statistics"));
+const AdminAuditLogs = lazy(() => import("./pages/admin/AuditLogs"));
 
 export interface VersionContextValue {
   versionInfo: Resource<any>;
@@ -61,35 +71,35 @@ function App() {
     setMobile(e.matches);
   };
 
-  const { refresh } = useAuth();
-  const onReceiveToken = async (e: MessageEvent) => {
-    if (e.data && e.data.type === "login" && e.data.token) {
-      localStorage.setItem("accessToken", e.data.token);
-      window.githubOAuthPopup?.close();
-      await refresh();
-    }
-  };
-
-  onMount(() => {
-    mobileMediaQuery.addEventListener("change", handleMobileChange);
-    window.addEventListener("message", onReceiveToken);
-  });
+  mobileMediaQuery.addEventListener("change", handleMobileChange);
   onCleanup(() => {
     mobileMediaQuery.removeEventListener("change", handleMobileChange);
-    window.removeEventListener("message", onReceiveToken);
   });
 
   return (
     <VersionContext.Provider value={versionContextValue}>
       <MobileContext.Provider value={mobile}>
-        <Router base={import.meta.env.BASE_URL.replace(/(.+)\/$/, "$1")}>
-          <Route path="/" component={Home} />
-          <Route path="/user/:id" component={User} />
-          <Route path="/decks/:id" component={EditDeck} />
-          <Route path="/decks" component={Decks} />
-          <Route path="/rooms/:code" component={Room} />
-          <Route path="*" component={NotFound} />
-        </Router>
+        <AuthProvider>
+          <Router base={import.meta.env.BASE_URL.replace(/(.+)\/$/, "$1")}>
+            <Route path="/" component={Home} />
+            <Route path="/login" component={LoginPage} />
+            <Route path="/register" component={Register} />
+            <Route path="/user/:id" component={User} />
+            <Route path="/decks/:id" component={EditDeck} />
+            <Route path="/decks" component={Decks} />
+            <Route path="/competition/games/:id" component={TournamentGame} />
+            <Route path="/rooms/:code" component={Room} />
+            <Route path="/admin" component={AdminHome} />
+            <Route path="/admin/users" component={AdminUsers} />
+            <Route path="/admin/events" component={AdminEvents} />
+            <Route path="/admin/events/new" component={AdminEventEditor} />
+            <Route path="/admin/events/:id" component={AdminEvent} />
+            <Route path="/admin/matches/:id" component={AdminMatch} />
+            <Route path="/admin/statistics" component={AdminStatistics} />
+            <Route path="/admin/audit-logs" component={AdminAuditLogs} />
+            <Route path="*" component={NotFound} />
+          </Router>
+        </AuthProvider>
       </MobileContext.Provider>
     </VersionContext.Provider>
   );

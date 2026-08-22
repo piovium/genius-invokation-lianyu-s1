@@ -21,7 +21,6 @@ import {
   JSX,
   splitProps,
 } from "solid-js";
-import { makePersisted } from "@solid-primitives/storage";
 import axios, { AxiosError } from "axios";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { DeckInfoProps } from "./DeckBriefInfo";
@@ -152,10 +151,6 @@ export function RoomDialog(props: RoomDialogProps) {
     dialogEl.close();
   };
   const { versionInfo } = useVersionContext();
-  const [savedVersion, setSavedVersion] = makePersisted(
-    createSignal<string | null>(null),
-    { name: "room-game-version" },
-  );
   const [version, setVersion] = createSignal(-1);
   const [timeConfig, setTimeConfig] = createSignal(TIME_CONFIGS[1]);
   const [isPublic, setIsPublic] = createSignal(true);
@@ -172,10 +167,7 @@ export function RoomDialog(props: RoomDialogProps) {
       const ver = versions.indexOf(props.joiningRoomInfo.config.gameVersion);
       setVersion(ver);
     } else {
-      const savedVersionIndex = versions.indexOf(savedVersion());
-      setVersion(
-        savedVersionIndex >= 0 ? savedVersionIndex : versions.length - 1,
-      );
+      setVersion(versions.length - 1);
     }
   });
 
@@ -220,14 +212,7 @@ export function RoomDialog(props: RoomDialogProps) {
       let playerId = id ?? null;
       let response;
       if (typeof roomId === "undefined") {
-        const selectedVersion = version();
-        const selectedVersionName =
-          versionInfo()?.supportedGameVersions[selectedVersion];
-        if (selectedVersionName) {
-          setSavedVersion(selectedVersionName);
-        }
         const payload: any = {
-          gameVersion: selectedVersion,
           ...timeConfig(),
           private: !isPublic(),
           watchable: watchable(),
@@ -300,8 +285,7 @@ export function RoomDialog(props: RoomDialogProps) {
                 <select
                   class="disabled:pointer-events-none appearance-none"
                   value={version()}
-                  onChange={(e) => setVersion(Number(e.target.value))}
-                  disabled={!editable()}
+                  disabled
                 >
                   <For each={versionInfo()?.supportedGameVersions ?? []}>
                     {(version, idx) => <option value={idx()}>{version}</option>}

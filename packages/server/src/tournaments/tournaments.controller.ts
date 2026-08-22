@@ -43,6 +43,7 @@ import { User } from "../auth/user.decorator";
 import { parseStringToInt } from "../utils";
 import { TournamentsService } from "./tournaments.service";
 import { RoomsService } from "../rooms/rooms.service";
+import { DecksService } from "../decks/decks.service";
 
 export class ReasonDto {
   @IsString()
@@ -212,6 +213,7 @@ export class AdminTournamentsController {
   constructor(
     private readonly tournaments: TournamentsService,
     private readonly rooms: RoomsService,
+    private readonly decks: DecksService,
   ) {}
 
   @Get("registration/settings")
@@ -230,6 +232,11 @@ export class AdminTournamentsController {
     @Query("descending") descending?: string,
   ) {
     return this.tournaments.users(status, descending === "true");
+  }
+
+  @Get("users/:id/decks")
+  userDecks(@Param("id", ParseIntPipe) id: number) {
+    return this.decks.getAllDecks(id, { take: 100 });
   }
 
   @Patch("users/competition-status")

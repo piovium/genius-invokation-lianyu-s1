@@ -43,6 +43,7 @@ export type GuestDeck = readonly [
     ) => Promise<DeckInfo>;
     removeGuestDeck: (id: number) => Promise<void>;
     pinGuestDeck: (id: number) => Promise<void>;
+    clearGuestDecks: () => void;
   },
 ];
 
@@ -116,6 +117,7 @@ export const useGuestDecks = (): GuestDeck => {
       pinGuestDeck: async (id) => {
         await limit(updateGuestDeck, id, {});
       },
+      clearGuestDecks: () => setGuestDeck([]),
     },
   ];
 };

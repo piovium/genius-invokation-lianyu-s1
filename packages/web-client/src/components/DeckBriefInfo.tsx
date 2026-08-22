@@ -26,6 +26,8 @@ export interface DeckInfoProps extends DeckInfo {
   editable?: boolean;
   onDelete?: () => void;
   onPin?: () => void;
+  competitionLabel?: string;
+  onCompetition?: () => void;
 }
 
 function CharacterAvatar(props: { id: number }) {
@@ -127,6 +129,18 @@ export function DeckBriefInfo(props: DeckInfoProps) {
       <div class="p-1 md:p-2 flex flex-row items-center justify-around">
         <For each={props.characters}>{(id) => <CharacterAvatar id={id} />}</For>
       </div>
+      <Show when={props.competitionLabel}>
+        <button
+          class="mt-1 btn btn-outline-purple text-xs"
+          disabled={!props.onCompetition}
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onCompetition?.();
+          }}
+        >
+          {props.competitionLabel}
+        </button>
+      </Show>
     </div>
   );
 }
