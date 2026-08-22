@@ -761,6 +761,7 @@ export class RoomsService {
       name: user.name ?? user.login,
       deck,
       deckId: deck.id,
+      avatarUrl: user.avatarUrl,
     };
     const room = await this.createRoom(playerInfo, params);
     return { room };
@@ -907,6 +908,7 @@ export class RoomsService {
       name: user.name ?? user.login,
       deck,
       deckId: deck.id,
+      avatarUrl: user.avatarUrl,
     };
     return this.joinRoom(playerInfo, roomId);
   }
@@ -1039,6 +1041,7 @@ export class RoomsService {
     userId: number;
     who: 0 | 1;
     playerName: string;
+    avatarUrl?: string;
     deckId: number | null;
     deck: Deck;
     roomConfig: Partial<CreateRoomDto>;
@@ -1067,6 +1070,7 @@ export class RoomsService {
           name: input.playerName,
           deck: input.deck,
           deckId: input.deckId,
+          avatarUrl: input.avatarUrl,
         };
         await this.joinRoom(playerInfo, existingRoomId, false);
         return { room: room.getRoomInfo(), gameId: input.gameId };
@@ -1082,6 +1086,7 @@ export class RoomsService {
       name: input.playerName,
       deck: input.deck,
       deckId: input.deckId,
+      avatarUrl: input.avatarUrl,
     };
     const roomInfo = await this.createRoom(playerInfo, {
       ...input.roomConfig,
