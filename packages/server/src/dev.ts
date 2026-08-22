@@ -32,7 +32,7 @@ const importFlags = [
 ];
 
 async function localDev() {
-  const server = await startLocalPrisma("gi-tcg-server-dev");
+  const server = await startLocalPrisma("gi-tcg-lianyu-s1-server-dev");
   try {
     // Use `pnpm prisma migrate deploy` as a workaround until this is fixed: https://github.com/prisma/prisma/issues/29366
     await $({
