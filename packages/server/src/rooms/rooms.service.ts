@@ -605,6 +605,7 @@ class Room {
   }
 
   stop() {
+    if (this.terminated) return;
     this.terminated = true;
     this.endedAt = new Date();
     this.players[0]?.complete();
@@ -612,6 +613,11 @@ class Room {
     for (const cb of this.onStopHandlers) {
       cb(this, this.game);
     }
+  }
+
+  adminTerminate() {
+    if (this.status === RoomStatus.Playing) this.game?.giveUp(0);
+    this.stop();
   }
 
   onStop(cb: GameStopHandler) {
@@ -669,6 +675,7 @@ export class RoomsService {
 
   private roomIdPool = toShuffled(Array.from({ length: 10000 }, (_, i) => i));
   private rooms = new Map<number, Room>();
+  private tournamentRooms = new Map<number, number>();
   private shutdownResolvers: PromiseWithResolvers<void> | null = null;
 
   constructor(
@@ -882,7 +889,7 @@ export class RoomsService {
     if (room.getHost()?.playerInfo.id !== playerId) {
       throw new UnauthorizedException(`You are not the host of room ${roomId}`);
     }
-    room.stop();
+    room.adminTerminate();
   }
 
   async joinRoomFromUser(userId: number, roomId: number, deckId: number) {
@@ -918,7 +925,11 @@ export class RoomsService {
     return { playerId };
   }
 
-  private async joinRoom(playerInfo: PlayerInfo, roomId: number) {
+  private async joinRoom(
+    playerInfo: PlayerInfo,
+    roomId: number,
+    persistCasual = true,
+  ) {
     const allRooms = this.getAllRooms(true);
     const room = this.rooms.get(roomId);
     if (!room) {
@@ -955,51 +966,52 @@ export class RoomsService {
 
     room.setParticipant(new Player(playerInfo));
     // Add to game database when room stopped
-    room.onStop((room, game) => {
-      if (!game) {
-        return;
-      }
-      const players = room.getPlayers();
-      const stateLog = room.getStateLog();
-      const gameData = JSON.stringify(stateLog);
-      if (s3) {
-        const now = new Date().toISOString();
-        const date = now.slice(0, 10);
-        const time = now.slice(11, 19).replaceAll(":", "");
-        const s3Prefix = process.env.S3_PREFIX;
-        const keyPrefix = s3Prefix ? `${s3Prefix}/` : "";
-        const command = new PutObjectCommand({
-          Bucket: process.env.S3_BUCKET!,
-          Key: `${keyPrefix}logs/${date}/${time}-${room.id}.json`,
-          Body: gameData,
-          ContentType: "application/json",
-        });
-        s3.send(command).catch((error) => {
-          this.logger.warn(
-            `Failed to upload room ${room.id} game log: ${error}`,
-          );
-        });
-      }
-      const winnerWho = game.state.winner;
-      this.games
-        .addGame({
-          coreVersion: Room.CORE_VERSION,
-          gameVersion: room.config.gameVersion,
-          stateLog,
-          winnerWho,
-          endReason: room.getEndReason(),
-          startedAt: room.getStartedAt(),
-          players: players.map(({ playerInfo }) => ({
-            userId: playerInfo.isGuest ? null : playerInfo.id,
-            deckId: playerInfo.deckId,
-            name: playerInfo.name,
-            deck: playerInfo.deck,
-          })),
-        })
-        .catch((error) => {
-          this.logger.error(`Failed to persist room ${room.id}: ${error}`);
-        });
-    });
+    if (persistCasual)
+      room.onStop((room, game) => {
+        if (!game) {
+          return;
+        }
+        const players = room.getPlayers();
+        const stateLog = room.getStateLog();
+        const gameData = JSON.stringify(stateLog);
+        if (s3) {
+          const now = new Date().toISOString();
+          const date = now.slice(0, 10);
+          const time = now.slice(11, 19).replaceAll(":", "");
+          const s3Prefix = process.env.S3_PREFIX;
+          const keyPrefix = s3Prefix ? `${s3Prefix}/` : "";
+          const command = new PutObjectCommand({
+            Bucket: process.env.S3_BUCKET!,
+            Key: `${keyPrefix}logs/${date}/${time}-${room.id}.json`,
+            Body: gameData,
+            ContentType: "application/json",
+          });
+          s3.send(command).catch((error) => {
+            this.logger.warn(
+              `Failed to upload room ${room.id} game log: ${error}`,
+            );
+          });
+        }
+        const winnerWho = game.state.winner;
+        this.games
+          .addGame({
+            coreVersion: Room.CORE_VERSION,
+            gameVersion: room.config.gameVersion,
+            stateLog,
+            winnerWho,
+            endReason: room.getEndReason(),
+            startedAt: room.getStartedAt(),
+            players: players.map(({ playerInfo }) => ({
+              userId: playerInfo.isGuest ? null : playerInfo.id,
+              deckId: playerInfo.deckId,
+              name: playerInfo.name,
+              deck: playerInfo.deck,
+            })),
+          })
+          .catch((error) => {
+            this.logger.error(`Failed to persist room ${room.id}: ${error}`);
+          });
+      });
     room.start();
     try {
       await redis?.hset(
@@ -1022,6 +1034,90 @@ export class RoomsService {
     this.metrics.incrementStartedRooms();
   }
 
+  async joinTournamentGame(input: {
+    gameId: number;
+    userId: number;
+    who: 0 | 1;
+    playerName: string;
+    deckId: number | null;
+    deck: Deck;
+    roomConfig: Partial<CreateRoomDto>;
+    finalize: (result: {
+      winnerWho: number | null;
+      endReason: "NORMAL" | "ENGINE_ERROR" | "SURRENDER";
+      stateLog: unknown;
+    }) => Promise<unknown>;
+  }) {
+    const existingRoomId = this.tournamentRooms.get(input.gameId);
+    if (existingRoomId !== undefined) {
+      const room = this.rooms.get(existingRoomId);
+      if (!room) {
+        this.tournamentRooms.delete(input.gameId);
+      } else {
+        if (
+          room
+            .getPlayers()
+            .some((player) => player.playerInfo.id === input.userId)
+        ) {
+          return { room: room.getRoomInfo(), gameId: input.gameId };
+        }
+        const playerInfo: PlayerInfo = {
+          isGuest: false,
+          id: input.userId,
+          name: input.playerName,
+          deck: input.deck,
+          deckId: input.deckId,
+        };
+        await this.joinRoom(playerInfo, existingRoomId, false);
+        return { room: room.getRoomInfo(), gameId: input.gameId };
+      }
+    }
+
+    if (this.currentRoom(input.userId)) {
+      throw new ConflictException(`User ${input.userId} is already in a room`);
+    }
+    const playerInfo: PlayerInfo = {
+      isGuest: false,
+      id: input.userId,
+      name: input.playerName,
+      deck: input.deck,
+      deckId: input.deckId,
+    };
+    const roomInfo = await this.createRoom(playerInfo, {
+      ...input.roomConfig,
+      hostFirst: input.who === 0,
+      allowGuest: false,
+      private: true,
+    });
+    const room = this.rooms.get(roomInfo.id)!;
+    this.tournamentRooms.set(input.gameId, room.id);
+    room.onStop((finishedRoom, game) => {
+      this.tournamentRooms.delete(input.gameId);
+      if (!game) return;
+      input
+        .finalize({
+          winnerWho: game.state.winner,
+          endReason: finishedRoom.getEndReason(),
+          stateLog: finishedRoom.getStateLog(),
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Failed to finalize tournament game ${input.gameId}: ${error}`,
+          );
+        });
+    });
+    return { room: roomInfo, gameId: input.gameId };
+  }
+
+  terminateTournamentGame(gameId: number) {
+    const roomId = this.tournamentRooms.get(gameId);
+    if (roomId === undefined) return false;
+    const room = this.rooms.get(roomId);
+    if (!room) return false;
+    room.adminTerminate();
+    return true;
+  }
+
   getRoom(roomId: number): RoomInfo {
     const room = this.rooms.get(roomId);
     if (!room) {
@@ -1030,7 +1126,7 @@ export class RoomsService {
     return room.getRoomInfo();
   }
 
-  getRoomGameLog(playerId: PlayerId, roomId: number) {
+  getRoomGameLog(playerId: PlayerId, roomId: number, isAdmin = false) {
     const room = this.rooms.get(roomId);
     if (!room) {
       throw new NotFoundException(`Room not found`);
@@ -1039,6 +1135,7 @@ export class RoomsService {
       throw new ConflictException(`Room ${roomId} is not finished`);
     }
     if (
+      isAdmin ||
       room.config.watchable ||
       room.getPlayers().some((p) => p.playerInfo.id === playerId)
     ) {
@@ -1050,16 +1147,16 @@ export class RoomsService {
     }
   }
 
-  getAllRooms(guest: boolean): RoomInfo[] {
+  getAllRooms(guest: boolean, isAdmin = false): RoomInfo[] {
     const result: RoomInfo[] = [];
     for (const room of this.rooms.values()) {
       if (room.status === RoomStatus.Finished) {
         continue;
       }
-      if (room.config.private) {
+      if (!isAdmin && room.config.private) {
         continue;
       }
-      if (guest && !room.config.allowGuest) {
+      if (!isAdmin && guest && !room.config.allowGuest) {
         continue;
       }
       result.push(room.getRoomInfo());
@@ -1071,6 +1168,7 @@ export class RoomsService {
     roomId: number,
     visitorPlayerId: PlayerId | null,
     watchingPlayerId: PlayerId,
+    isAdmin = false,
   ): Observable<{ data: SSEPayload }> {
     const room = this.rooms.get(roomId);
     if (!room) {
@@ -1081,12 +1179,17 @@ export class RoomsService {
     if (!playerUserIds.includes(watchingPlayerId)) {
       throw new NotFoundException(`Player ${watchingPlayerId} not in room`);
     }
-    if (!room.config.watchable && visitorPlayerId !== watchingPlayerId) {
+    if (
+      !isAdmin &&
+      !room.config.watchable &&
+      visitorPlayerId !== watchingPlayerId
+    ) {
       throw new UnauthorizedException(
         `Room ${roomId} cannot be watched by other`,
       );
     }
     if (
+      !isAdmin &&
       (playerUserIds as (PlayerId | null)[]).includes(visitorPlayerId) &&
       visitorPlayerId !== watchingPlayerId
     ) {

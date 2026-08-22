@@ -68,6 +68,7 @@ await build({
     /^@nestjs\/websockets/,
     "@fastify/view",
     "@fastify/static",
+    /^@node-rs\/argon2/,
   ],
   plugins: [
     inlineFrontendPlugin,

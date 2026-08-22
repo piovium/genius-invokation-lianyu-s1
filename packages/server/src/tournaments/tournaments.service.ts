@@ -84,6 +84,9 @@ export class TournamentsService {
   }
 
   async createEvent(actorUserId: number, dto: CreateEventDto) {
+    if (dto.event.initialPhase === "FINISHED") {
+      throw new ConflictException("Cannot create an already-finished event");
+    }
     const ids = [...dto.player0Ids, ...dto.player1Ids];
     if (new Set(ids).size !== ids.length) {
       throw new ConflictException("Duplicate player in event request");
@@ -152,7 +155,24 @@ export class TournamentsService {
         for (const matchId of matchIds)
           await this.createNextGameTx(tx, matchId, true);
       }
-      return this.event(event.id);
+      return tx.tournamentEvent.findUnique({
+        where: { id: event.id },
+        include: {
+          matches: {
+            include: {
+              participants: {
+                include: {
+                  user: { select: { id: true, qq: true, name: true } },
+                },
+                orderBy: { who: "asc" },
+              },
+              matchDecks: true,
+              games: { include: { players: true }, orderBy: { id: "asc" } },
+            },
+            orderBy: { id: "asc" },
+          },
+        },
+      });
     });
   }
 
@@ -470,8 +490,50 @@ export class TournamentsService {
           characterKey: snapshot.characterKey,
         },
       });
+      const players = await tx.gamePlayer.findMany({ where: { gameId } });
+      if (
+        players.length === 2 &&
+        players.every((item) => item.deckJson !== null)
+      ) {
+        await tx.game.update({
+          where: { id: gameId },
+          data: { startedAt: game.startedAt ?? new Date() },
+        });
+      }
       return { gameId, who: player.who, ready: true };
     });
+  }
+
+  async tournamentRoomData(gameId: number, userId: number) {
+    const game = await this.prisma.game.findUniqueOrThrow({
+      where: { id: gameId },
+      include: {
+        match: true,
+        players: {
+          where: { userId },
+          include: { user: { select: { name: true } } },
+        },
+      },
+    });
+    if (!game.match || game.status !== "PENDING") {
+      throw new ConflictException("MATCH_COMPLETED");
+    }
+    const player = game.players[0];
+    if (!player?.deckJson || !player.user) {
+      throw new ConflictException("TOURNAMENT_DECK_NOT_SELECTED");
+    }
+    return {
+      gameId,
+      userId,
+      who: player.who as 0 | 1,
+      playerName: player.user.name,
+      deckId: player.deckId,
+      deck: player.deckJson as unknown as {
+        characters: number[];
+        cards: number[];
+      },
+      roomConfig: game.match.roomConfig as Record<string, unknown>,
+    };
   }
 
   async finalizeGame(input: {
@@ -841,8 +903,16 @@ export class TournamentsService {
             "User",
             userId,
             reason,
-            before,
-            after,
+            {
+              competitionStatus: before.competitionStatus,
+              appliedAt: before.appliedAt,
+              activeMatchId: before.activeMatchId,
+            },
+            {
+              competitionStatus: after.competitionStatus,
+              appliedAt: after.appliedAt,
+              activeMatchId: after.activeMatchId,
+            },
           );
           return after;
         });
