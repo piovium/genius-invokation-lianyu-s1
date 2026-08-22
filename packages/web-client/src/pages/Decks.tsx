@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import { For, Match, Switch, createResource, Accessor } from "solid-js";
+import { For, Match, Switch, createResource, Accessor, Show } from "solid-js";
 import { Layout } from "../layouts/Layout";
 import axios, { AxiosError } from "axios";
 import { A } from "@solidjs/router";
@@ -22,12 +22,15 @@ import type { Deck } from "@gi-tcg/typings";
 import { useGuestDecks } from "../guest";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
+import type { MatchDeck } from "../api/models";
+import { errorMessage } from "../api/errors";
 
 export interface DeckInfo extends Deck {
   id: number;
   name: string;
   code: string;
   requiredVersion: number;
+  competition?: MatchDeck | null;
 }
 
 interface DecksResponse {
@@ -80,6 +83,31 @@ export default function Decks() {
   const { decks, loading, error, refetch } = useDecks();
   const [, { pinGuestDeck }] = useGuestDecks();
 
+  const selected = () => decks().data.filter((deck) => deck.competition);
+  const exhausted = () =>
+    selected().filter((deck) => !deck.competition!.usable);
+  const available = () => selected().filter((deck) => deck.competition!.usable);
+  const ordinary = () => decks().data.filter((deck) => !deck.competition);
+  const context = () => selected()[0]?.competition?.match;
+  const currentUser = () => {
+    const current = status();
+    return current.type === "user" ? current : null;
+  };
+  const canManage = () =>
+    currentUser()?.competitionStatus === "PLAYER" &&
+    !!currentUser()?.activeMatchId &&
+    (!context() || context()?.event.phase === "DECK_COLLECTION");
+
+  const toggleCompetition = async (deck: DeckInfo, select: boolean) => {
+    try {
+      if (select) await axios.put(`decks/${deck.id}/competition`);
+      else await axios.delete(`decks/${deck.id}/competition`);
+      refetch();
+    } catch (reason) {
+      alert(errorMessage(reason));
+    }
+  };
+
   const pinDeck = async (deck: DeckInfo) => {
     const { type } = status();
     try {
@@ -113,23 +141,84 @@ export default function Decks() {
             {t("loadFailed", { message: error()?.message ?? String(error()) })}
           </Match>
           <Match when={true}>
-            <ul class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] md:gap-3 md:overflow-y-auto scrollbar-thin-hover">
-              <For
-                each={decks().data}
-                fallback={
-                  <li class="p-4 text-gray-5">{t("noDecksAddHint")}</li>
-                }
-              >
-                {(deckData) => (
-                  <DeckBriefInfo
-                    editable
-                    onDelete={() => refetch()}
-                    onPin={() => pinDeck(deckData)}
-                    {...deckData}
-                  />
-                )}
-              </For>
-            </ul>
+            <div class="overflow-y-auto scrollbar-thin-hover pb-6">
+              <Show when={selected().length}>
+                <section class="mb-6 rounded-xl bg-purple-50 p-3 b b-purple-2">
+                  <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-bold">比赛牌组</h3>
+                    <span class="text-sm">
+                      已选择 {selected().length} /{" "}
+                      {context()?.event.deckLimit || "不限"}
+                    </span>
+                  </div>
+                  <Show when={context()?.event.phase !== "DECK_COLLECTION"}>
+                    <p class="mb-3 text-sm text-purple-8">
+                      <i class="i-mdi-lock" /> 场次已进入
+                      {context()?.event.phase === "RUNNING" ? "进行中" : "结束"}
+                      阶段，比赛牌组已锁定。
+                    </p>
+                  </Show>
+                  <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+                    <For each={available()}>
+                      {(deckData) => (
+                        <DeckBriefInfo
+                          competitionLabel="比赛牌组 · 可用"
+                          onCompetition={
+                            canManage()
+                              ? () => toggleCompetition(deckData, false)
+                              : undefined
+                          }
+                          {...deckData}
+                        />
+                      )}
+                    </For>
+                  </ul>
+                </section>
+              </Show>
+              <Show when={exhausted().length}>
+                <section class="mb-6 rounded-xl bg-orange-50 p-3 b b-orange-2">
+                  <h3 class="text-lg font-bold mb-3">已耗尽比赛牌组</h3>
+                  <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+                    <For each={exhausted()}>
+                      {(deckData) => (
+                        <DeckBriefInfo
+                          competitionLabel={`已耗尽 · ${deckData.competition?.disableReason ?? "不可用"}`}
+                          {...deckData}
+                        />
+                      )}
+                    </For>
+                  </ul>
+                </section>
+              </Show>
+              <section>
+                <h3 class="text-lg font-bold mb-3">其它牌组</h3>
+                <ul class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] md:gap-3">
+                  <For
+                    each={ordinary()}
+                    fallback={
+                      <li class="p-4 text-gray-5">{t("noDecksAddHint")}</li>
+                    }
+                  >
+                    {(deckData) => (
+                      <DeckBriefInfo
+                        editable
+                        onCompetition={
+                          canManage()
+                            ? () => toggleCompetition(deckData, true)
+                            : undefined
+                        }
+                        competitionLabel={
+                          canManage() ? "设为比赛牌组" : undefined
+                        }
+                        onDelete={() => refetch()}
+                        onPin={() => pinDeck(deckData)}
+                        {...deckData}
+                      />
+                    )}
+                  </For>
+                </ul>
+              </section>
+            </div>
           </Match>
         </Switch>
       </div>

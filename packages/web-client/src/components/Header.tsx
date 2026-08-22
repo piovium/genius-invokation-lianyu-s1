@@ -14,7 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import { A, useNavigate } from "@solidjs/router";
-import { Show } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { IS_BETA } from "@gi-tcg/config";
 import Logo from "./Logo.svg";
 import Title from "./Title.svg";
@@ -28,6 +28,11 @@ export function Header() {
   const navigate = useNavigate();
   const { status, logout, avatarUrl } = useAuth();
   const { t, locale, setLocale } = useI18n();
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  const user = () => {
+    const current = status();
+    return current.type === "user" ? current : null;
+  };
   return (
     <header class="fixed top-0 left-0 w-100dvw flex flex-row h-[calc(3rem+var(--root-padding-top))] md:h-[calc(4rem+var(--root-padding-top))] pt-[var(--root-padding-top)] bg-white z-200 px-4 shadow-md items-center gap-2">
       <img src={Logo} class="h-10 md:h-12" />
@@ -47,6 +52,18 @@ export function Header() {
           </Show>
         </div>
       </div>
+      <Show when={status().type === "user"}>
+        <nav class="hidden md:flex gap-3 text-sm items-center">
+          <A class="hover:text-blue-6" href="/decks">
+            我的牌组
+          </A>
+          <Show when={user()?.role === "ADMIN"}>
+            <A class="hover:text-blue-6 font-bold" href="/admin">
+              赛事管理
+            </A>
+          </Show>
+        </nav>
+      </Show>
       <div class="flex flex-row items-center relative">
         <select
           class="select h-8 text-xs border rounded-full pl-7 py-1 bg-white"
@@ -64,6 +81,13 @@ export function Header() {
         />
       </div>
       <Show when={status().type !== "notLogin"}>
+        <button
+          class="md:hidden btn btn-ghost h-9 w-9 p-1"
+          aria-label="打开导航菜单"
+          onClick={() => setMenuOpen(!menuOpen())}
+        >
+          <i class="i-mdi-menu text-xl" />
+        </button>
         <A
           href={
             status().type === "guest" ? `/user/guest` : `/user/${status().id}`
@@ -83,6 +107,25 @@ export function Header() {
           <i class="i-mdi-logout" />
           <span class="hidden sm:inline">{t("logout")}</span>
         </button>
+      </Show>
+      <Show when={menuOpen()}>
+        <div class="absolute right-3 top-[calc(3rem+var(--root-padding-top))] rounded-lg bg-white shadow-lg b b-gray-2 p-2 flex flex-col min-w-35 md:hidden">
+          <A class="p-2" href="/" onClick={() => setMenuOpen(false)}>
+            首页
+          </A>
+          <A class="p-2" href="/decks" onClick={() => setMenuOpen(false)}>
+            我的牌组
+          </A>
+          <Show when={user()?.role === "ADMIN"}>
+            <A
+              class="p-2 font-bold"
+              href="/admin"
+              onClick={() => setMenuOpen(false)}
+            >
+              赛事管理
+            </A>
+          </Show>
+        </div>
       </Show>
     </header>
   );

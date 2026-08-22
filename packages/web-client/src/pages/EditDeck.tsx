@@ -36,6 +36,8 @@ import { copyShareCode } from "../utils";
 import { useI18n } from "../i18n";
 import { TextFieldEdit } from "../components/TextFieldEdit";
 import { AutoResizeText } from "@gi-tcg/web-ui-core";
+import type { MatchDeck } from "../api/models";
+import { errorMessage } from "../api/errors";
 
 export default function EditDeck() {
   const { t, locale, assetsManager } = useI18n();
@@ -57,6 +59,14 @@ export default function EditDeck() {
   const [userDeckData] = createResource(() =>
     isNew ? void 0 : axios.get(`decks/${deckId}`).then((r) => r.data),
   );
+  const competition = () =>
+    (
+      userDeckData() as
+        (DeckInfo & { competition?: MatchDeck | null }) | undefined
+    )?.competition;
+  const fullyLocked = () => competition()?.match?.event.phase === "RUNNING";
+  const characterKey = (characters: readonly number[]) =>
+    [...characters].sort((a, b) => a - b).join(":");
 
   createEffect(() => {
     if (isNew) {
@@ -104,6 +114,14 @@ export default function EditDeck() {
   };
 
   const importCode = () => {
+    if (competition()) {
+      alert(
+        fullyLocked()
+          ? "场次进行中，比赛牌组只读。"
+          : "比赛牌组不能通过分享码导入；如需更换角色，请先取消比赛设置。",
+      );
+      return;
+    }
     const input = window.prompt(t("inputShareCode"));
     if (input === null) {
       return;
@@ -134,6 +152,7 @@ export default function EditDeck() {
   };
 
   const saveName = async (newName: string) => {
+    if (fullyLocked()) return false;
     const oldName = deckName();
     const { type } = status();
     if (!isNew) {
@@ -183,9 +202,7 @@ export default function EditDeck() {
       }
       return true;
     } catch (e) {
-      if (e instanceof AxiosError) {
-        alert(e.response?.data.message);
-      }
+      alert(errorMessage(e));
       console.error(e);
       return false;
     } finally {
@@ -203,9 +220,14 @@ export default function EditDeck() {
             cancelText={t("cancel")}
             class="text-xl md:text-2xl font-bold "
             onSave={saveName}
+            disable={fullyLocked()}
           />
           <div class="flex flex-row flex-1 gap-1 md:gap-3 text-3.2 md:text-3.5">
-            <button class="btn btn-outline-blue" onClick={importCode}>
+            <button
+              class="btn btn-outline-blue"
+              onClick={importCode}
+              disabled={fullyLocked()}
+            >
               {t("importShareCode")}
             </button>
             <button class="btn btn-outline" onClick={exportCode}>
@@ -213,7 +235,7 @@ export default function EditDeck() {
             </button>
             <button
               class="flex-shrink-0 btn btn-solid-green min-w-15 md:min-w-22 max-w-20% py-0 px-1"
-              disabled={!valid() || uploading()}
+              disabled={!valid() || uploading() || fullyLocked()}
               onClick={async () => {
                 if (await saveDeck()) {
                   if (isNew) {
@@ -245,6 +267,14 @@ export default function EditDeck() {
             </button>
           </div>
         </div>
+        <Show when={competition()}>
+          <div class="alert alert-border-warning mb-3">
+            <i class="i-mdi-lock" />{" "}
+            {fullyLocked()
+              ? "场次进行中：比赛牌组已完全锁定，仅可导出分享码。"
+              : "收集阶段：可调整行动牌和角色顺序，但不可增删角色；更换角色请先取消比赛牌组。"}
+          </div>
+        </Show>
         <Switch>
           <Match when={userDeckData.loading}>{t("loading")}</Match>
           <Match when={status().type !== "guest" && userDeckData.error}>
@@ -261,7 +291,19 @@ export default function EditDeck() {
               assetsManager={assetsManager()}
               locale={locale()}
               deck={deckValue()}
-              onChangeDeck={(v) => (setDeckValue(v), setDirty(true))}
+              onChangeDeck={(v) => {
+                if (fullyLocked()) return;
+                if (
+                  competition() &&
+                  characterKey(v.characters) !==
+                    characterKey(deckValue().characters)
+                ) {
+                  alert("比赛牌组不能增删角色；可以调整现有角色顺序。");
+                  return;
+                }
+                setDeckValue(v);
+                setDirty(true);
+              }}
             />
           </Match>
         </Switch>

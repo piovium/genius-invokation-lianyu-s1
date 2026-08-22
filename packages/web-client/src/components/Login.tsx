@@ -1,94 +1,162 @@
-// Copyright (C) 2024-2025 Guyutongxue
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024-2026 Guyutongxue
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { createSignal } from "solid-js";
-import { GITHUB_AUTH_REDIRECT_URL } from "../config";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
+import axios from "axios";
+import { Show, createSignal } from "solid-js";
 import { useAuth } from "../auth";
-import { useI18n } from "../i18n";
+import { errorMessage } from "../api/errors";
+import { getPasskey, isPasskeySupported } from "../auth/passkey";
+
+interface AuthResult {
+  accessToken: string;
+  userId: number;
+}
 
 export function Login() {
-  const CLIENT_ID = "Iv23liMGX6EkkrfUax8B";
-  const REDIRECT_URL = encodeURIComponent(GITHUB_AUTH_REDIRECT_URL);
-  const { loginGuest } = useAuth();
-  const { t } = useI18n();
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [qq, setQq] = createSignal("");
+  const [password, setPassword] = createSignal("");
+  const [guestName, setGuestName] = createSignal("");
+  const [busy, setBusy] = createSignal(false);
+  const [error, setError] = createSignal("");
 
-  const showGuestHint = () => {
-    window.alert(t("guestModeHint"));
-  };
-
-  const [guestNameValid, setGuestNameValid] = createSignal(false);
-
-  const githubLogin = () => {
-    const popup = window.open(
-      `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URL}`,
-      'githubOAuth',
-      'popup,width=600,height=700'
+  const finish = () => {
+    const redirect = searchParams.redirect;
+    navigate(
+      typeof redirect === "string" && redirect.startsWith("/") ? redirect : "/",
     );
-    if (!popup) {
-      window.alert(t("allowPopup"));
-      return;
-    }
-    window.githubOAuthPopup = popup;
   };
 
-  const guestLogin = async (e: SubmitEvent) => {
-    e.preventDefault();
-    const form = new FormData(e.target as HTMLFormElement);
-    const name = form.get("guestName") as string;
-    loginGuest(name);
+  const passwordLogin = async (event: SubmitEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await auth.loginWithPassword(qq(), password());
+      finish();
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const passkeyLogin = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const { data } = await axios.post<{
+        challengeId: string;
+        options: PublicKeyCredentialRequestOptionsJSON;
+      }>("auth/login/passkey/options", { qq: qq() });
+      const response = await getPasskey(data.options);
+      const result = await axios.post<AuthResult>("auth/login/passkey/verify", {
+        challengeId: data.challengeId,
+        response,
+      });
+      await auth.acceptToken(result.data);
+      finish();
+    } catch (reason) {
+      if ((reason as DOMException)?.name !== "NotAllowedError") {
+        setError(errorMessage(reason));
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div class="w-80 flex flex-col items-stretch text-xl my-8 gap-10">
-      <button
-        class="flex flex-row gap-2 btn btn-solid-black h-2.8em"
-        onClick={githubLogin}
-      >
-        <i class="block i-mdi-github" />
-        <span>{t("recommendGithubLogin")}</span>
-      </button>
-      <hr />
-      <div class="flex flex-col gap-1">
-        <p class="text-gray-500 text-sm">
-          {t("continueAsGuest")}{" "}
-          <span class="text-blue-400 cursor-pointer" onClick={showGuestHint}>
-            {t("guestIdentity")}
-          </span>{" "}
-          {t("continueSuffix")}
-        </p>
-        <form class="flex flex-row items-stretch" onSubmit={guestLogin}>
+    <div class="w-full max-w-105 flex flex-col gap-6 rounded-xl b b-gray-2 p-6 shadow-sm">
+      <div>
+        <h2 class="text-2xl font-bold">QQ 账号登录</h2>
+        <p class="mt-1 text-sm text-gray-5">管理员与参赛用户使用同一入口。</p>
+      </div>
+      <Show when={error()}>
+        <div class="alert alert-border-error" role="alert">
+          {error()}
+        </div>
+      </Show>
+      <form class="flex flex-col gap-4" onSubmit={passwordLogin}>
+        <label class="flex flex-col gap-1">
+          <span>QQ 号</span>
           <input
-            type="text"
-            class="input input-solid rounded-r-0 b-r-0 h-9 text-4"
-            name="guestName"
-            maxLength={64}
-            placeholder={t("guestNamePlaceholder")}
-            pattern=".*[^\s].*"
-            onInput={(e) => setGuestNameValid(e.target.checkValidity())}
+            class="input input-solid"
+            inputmode="numeric"
+            autocomplete="username"
+            pattern="\d{5,12}"
+            value={qq()}
+            onInput={(event) => setQq(event.currentTarget.value.trim())}
+            required
             autofocus
+          />
+        </label>
+        <label class="flex flex-col gap-1">
+          <span>密码</span>
+          <input
+            class="input input-solid"
+            type="password"
+            autocomplete="current-password"
+            value={password()}
+            onInput={(event) => setPassword(event.currentTarget.value)}
             required
           />
-          <button
-            type="submit"
-            class="flex-shrink-0 btn btn-solid rounded-l-0 h-9 text-4"
-            disabled={!guestNameValid()}
-          >
-            <span>{t("confirm")}</span>
+        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button class="btn btn-solid-primary" type="submit" disabled={busy()}>
+            {busy() ? "正在登录…" : "密码登录"}
           </button>
-        </form>
+          <button
+            class="btn btn-outline-primary"
+            type="button"
+            disabled={
+              busy() || !/^\d{5,12}$/.test(qq()) || !isPasskeySupported()
+            }
+            title={
+              isPasskeySupported() ? "" : "当前环境不支持 Passkey，请使用密码"
+            }
+            onClick={passkeyLogin}
+          >
+            使用 Passkey
+          </button>
+        </div>
+      </form>
+      <p class="text-center text-sm">
+        还没有账号？
+        <A class="text-blue-6 hover:underline" href="/register">
+          注册账号
+        </A>
+      </p>
+      <div class="flex items-center gap-3 text-gray-4">
+        <hr class="flex-1" />
+        <span>或游客模式</span>
+        <hr class="flex-1" />
       </div>
+      <form
+        class="flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          auth.loginGuest(guestName().trim());
+          finish();
+        }}
+      >
+        <input
+          class="input input-solid flex-1 min-w-0"
+          maxlength={64}
+          placeholder="游客昵称"
+          value={guestName()}
+          onInput={(event) => setGuestName(event.currentTarget.value)}
+          required
+        />
+        <button class="btn btn-outline" disabled={!guestName().trim()}>
+          继续
+        </button>
+      </form>
+      <p class="text-xs text-gray-5">
+        游客牌组只保存在此浏览器；游客对局仍会保存匿名统计快照。
+      </p>
     </div>
   );
 }
