@@ -145,6 +145,33 @@ export default function AdminMatch() {
       setMessage(errorMessage(e));
     }
   };
+  const editMatch = async () => {
+    const data = match();
+    if (!data || data.event?.phase === "FINISHED") return;
+    const maxGames = prompt("总局数", String(data.maxGames));
+    if (maxGames === null) return;
+    const winsRequired = prompt("胜局数", String(data.winsRequired));
+    if (winsRequired === null) return;
+    const mode = prompt("模式：UNRESTRICTED / DUEL / CONQUEST", data.mode);
+    if (!mode) return;
+    const roomConfig = prompt("房间配置 JSON", JSON.stringify(data.roomConfig));
+    if (roomConfig === null) return;
+    const reason = prompt("修改原因（审计必填）");
+    if (!reason?.trim()) return;
+    try {
+      await axios.patch(`admin/matches/${data.id}`, {
+        maxGames: Number(maxGames),
+        winsRequired: Number(winsRequired),
+        mode,
+        roomConfig: JSON.parse(roomConfig),
+        reason: reason.trim(),
+      });
+      refetch();
+      setMessage("盘次配置已更新。");
+    } catch (e) {
+      setMessage(errorMessage(e));
+    }
+  };
   const setWinner = async () => {
     const data = match();
     if (!data) return;
@@ -209,6 +236,13 @@ export default function AdminMatch() {
       title={`盘次 #${params.id}`}
       actions={
         <div class="flex flex-wrap gap-2">
+          <button
+            class="btn btn-outline"
+            disabled={!match() || match()?.event?.phase === "FINISHED"}
+            onClick={editMatch}
+          >
+            编辑盘次配置
+          </button>
           <button
             class="btn btn-outline"
             disabled={
