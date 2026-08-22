@@ -19,6 +19,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
@@ -187,12 +188,19 @@ export class RoomsController {
 
   @Get(":roomId")
   getRoom(
-    @User() userId: number | null,
+    @UserOrGuest() playerId: number | string | null,
     @IsAdmin() isAdmin: boolean,
     @Param("roomId", ParseIntPipe) roomId: number,
   ) {
     const room = this.rooms.getRoom(roomId);
-    if (!isAdmin && userId === null && !room.config.allowGuest) {
+    if (
+      !isAdmin &&
+      room.config.private &&
+      !room.players.some((player) => player.id === playerId)
+    ) {
+      throw new NotFoundException(`Room ${roomId} not found`);
+    }
+    if (!isAdmin && playerId === null && !room.config.allowGuest) {
       throw new UnauthorizedException(`This room does not allow guests`);
     }
     return room;
