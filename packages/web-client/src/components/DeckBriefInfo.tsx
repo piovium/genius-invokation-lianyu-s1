@@ -28,6 +28,7 @@ export interface DeckInfoProps extends DeckInfo {
   onPin?: () => void;
   competitionLabel?: string;
   onCompetition?: () => void;
+  viewable?: boolean;
 }
 
 function CharacterAvatar(props: { id: number }) {
@@ -91,7 +92,7 @@ export function DeckBriefInfo(props: DeckInfoProps) {
   return (
     <div
       class="w-full deck-info-card transition-all flex flex-col p-1 md:p-2 rounded-xl select-none cursor-default"
-      onClick={viewDeck}
+      onClick={props.viewable === false ? undefined : viewDeck}
     >
       <div class="px-2 py-1 flex flex-row justify-between items-center">
         <h5 class="font-bold text-blue-900 overflow-hidden whitespace-nowrap text-ellipsis">
