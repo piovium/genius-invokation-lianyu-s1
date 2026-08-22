@@ -34,7 +34,9 @@ interface DeckWithVersion extends Deck {
   requiredVersion: number;
 }
 
-export interface DeckWithDeckModel extends DeckWithVersion, DeckModel {}
+export interface DeckWithDeckModel extends DeckWithVersion, DeckModel {
+  competition?: unknown;
+}
 
 export function characterKey(characters: readonly number[]) {
   return [...characters].sort((a, b) => a - b).join(":");
@@ -128,6 +130,14 @@ export class DecksService {
         id: deckId,
         ownerUserId: userId,
       },
+      include: {
+        matchDecks: {
+          where: {
+            match: { event: { phase: { in: ["DECK_COLLECTION", "RUNNING"] } } },
+          },
+          include: { match: { include: { event: true } } },
+        },
+      },
     });
     if (model === null) {
       return null;
@@ -137,6 +147,7 @@ export class DecksService {
       ...model,
       characters,
       cards,
+      competition: model.matchDecks[0] ?? null,
     };
   }
 

@@ -15,6 +15,8 @@ export interface UserInfo {
   role: "USER" | "ADMIN";
   competitionStatus: "NONE" | "REGISTERED" | "PLAYER";
   appliedAt: Date | null;
+  queuePosition: number | null;
+  waitlisted: boolean;
   activeMatchId: number | null;
 }
 
@@ -25,6 +27,17 @@ export class UsersService {
   async findById(id: number): Promise<UserInfo | null> {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) return null;
+    const settings = await this.prisma.registrationSetting.findUnique({
+      where: { id: 1 },
+    });
+    const queuePosition = user.appliedAt
+      ? await this.prisma.user.count({
+          where: {
+            competitionStatus: { not: "NONE" },
+            appliedAt: { lte: user.appliedAt },
+          },
+        })
+      : null;
     return {
       id: user.id,
       qq: user.qq,
@@ -35,6 +48,12 @@ export class UsersService {
       role: user.role,
       competitionStatus: user.competitionStatus,
       appliedAt: user.appliedAt,
+      queuePosition,
+      waitlisted: !!(
+        queuePosition &&
+        settings?.limit &&
+        queuePosition > settings.limit
+      ),
       activeMatchId: user.activeMatchId,
     };
   }
