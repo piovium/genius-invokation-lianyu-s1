@@ -27,5 +27,6 @@ import { MetricsModule } from "../metrics/metrics.module";
   imports: [DecksModule, UsersModule, GamesModule, AuthModule, MetricsModule],
   providers: [RoomsService, ParsePlayerIdPipe],
   controllers: [RoomsController],
+  exports: [RoomsService],
 })
 export class RoomsModule {}
