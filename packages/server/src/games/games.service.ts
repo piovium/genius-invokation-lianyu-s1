@@ -71,11 +71,12 @@ export class GamesService {
     const [data, count] = await this.prisma.game.findManyAndCount({
       skip,
       take,
+      where: { status: "FINISHED" },
       omit: { stateLog: true },
       include: {
         players: {
           select: {
-            user: { select: { id: true, qq: true, name: true } },
+            user: { select: { id: true, name: true } },
             who: true,
             deckName: true,
           },
@@ -92,7 +93,7 @@ export class GamesService {
         where: { id: gameId },
         include: {
           players: {
-            include: { user: { select: { id: true, qq: true, name: true } } },
+            include: { user: { select: { id: true, name: true } } },
           },
         },
       }),
@@ -104,7 +105,8 @@ export class GamesService {
     if (
       game &&
       viewer?.role !== "ADMIN" &&
-      !game.players.some((player) => player.userId === viewerUserId)
+      (game.status !== "FINISHED" ||
+        !game.players.some((player) => player.userId === viewerUserId))
     ) {
       throw new ForbiddenException(
         "Only participants and administrators can read state logs",
@@ -117,7 +119,7 @@ export class GamesService {
     const [data, count] = await this.prisma.gamePlayer.findManyAndCount({
       skip,
       take,
-      where: { userId },
+      where: { userId, game: { status: "FINISHED" } },
       include: { game: { omit: { stateLog: true } } },
       orderBy: { game: { createdAt: "desc" } },
     });

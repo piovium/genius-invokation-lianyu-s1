@@ -29,6 +29,8 @@ interface PendingRegistration {
   apply: boolean;
 }
 
+type Tx = Parameters<Parameters<PrismaService["$transaction"]>[0]>[0];
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -60,8 +62,33 @@ export class AuthService {
     return this.jwtService.signAsync({
       user: 1,
       sub: user.id,
-      role: user.role,
     });
+  }
+
+  private async registrationData(tx: Tx, apply: boolean) {
+    if (!apply) return {};
+    const settings = await tx.registrationSetting.upsert({
+      where: { id: 1 },
+      create: { id: 1 },
+      update: {},
+    });
+    if (settings.cutoffAt && settings.cutoffAt.getTime() <= Date.now()) {
+      throw new BusinessException("REGISTRATION_CLOSED", "报名已经截止", 409);
+    }
+    return {
+      competitionStatus: "REGISTERED" as const,
+      appliedAt: new Date(),
+    };
+  }
+
+  private registeredConflict(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new BusinessException("QQ_ALREADY_REGISTERED", "该 QQ 已注册", 409);
+    }
+    throw error;
   }
 
   async checkQq(rawQq: string) {
@@ -79,6 +106,9 @@ export class AuthService {
     password: string;
     apply?: boolean;
   }) {
+    if (!input.name.trim()) {
+      throw new BusinessException("INVALID_NAME", "昵称不能为空", 400);
+    }
     const member = await this.qqGroup.findMember(input.qq, true);
     verifyRegistrationCode(member.qq, input.registrationCode);
     if (await this.prisma.user.findUnique({ where: { qq: member.qq } })) {
@@ -93,16 +123,23 @@ export class AuthService {
       timeCost: 2,
       parallelism: 1,
     });
-    const user = await this.prisma.user.create({
-      data: {
-        qq: member.qq,
-        name: input.name.trim(),
-        passwordHash,
-        role: this.isAdminQq(member.qq) ? "ADMIN" : "USER",
-      },
-    });
-    if (input.apply) await this.registration.apply(user.id, false);
-    return { accessToken: await this.accessToken(user), userId: user.id };
+    let user: User;
+    try {
+      user = await this.prisma.$transaction(async (tx) =>
+        tx.user.create({
+          data: {
+            qq: member.qq,
+            name: input.name.trim(),
+            passwordHash,
+            role: this.isAdminQq(member.qq) ? "ADMIN" : "USER",
+            ...(await this.registrationData(tx, input.apply ?? false)),
+          },
+        }),
+      );
+    } catch (error) {
+      this.registeredConflict(error);
+    }
+    return { accessToken: await this.accessToken(user!), userId: user!.id };
   }
 
   async loginPassword(rawQq: string, password: string) {
@@ -120,6 +157,9 @@ export class AuthService {
     name: string;
     apply?: boolean;
   }) {
+    if (!input.name.trim()) {
+      throw new BusinessException("INVALID_NAME", "昵称不能为空", 400);
+    }
     const member = await this.qqGroup.findMember(input.qq, true);
     verifyRegistrationCode(member.qq, input.registrationCode);
     if (await this.prisma.user.findUnique({ where: { qq: member.qq } })) {
@@ -176,27 +216,35 @@ export class AuthService {
       );
     }
     const payload = challenge.payload as unknown as PendingRegistration;
+    await this.qqGroup.findMember(challenge.qq, true);
     const { credential, credentialDeviceType, credentialBackedUp } =
       verification.registrationInfo;
-    const user = await this.prisma.user.create({
-      data: {
-        qq: challenge.qq,
-        name: payload.name,
-        role: this.isAdminQq(challenge.qq) ? "ADMIN" : "USER",
-        passkeys: {
-          create: {
-            id: credential.id,
-            publicKey: Buffer.from(credential.publicKey),
-            counter: BigInt(credential.counter),
-            transports: credential.transports ?? [],
-            deviceType: credentialDeviceType,
-            backedUp: credentialBackedUp,
+    let user: User;
+    try {
+      user = await this.prisma.$transaction(async (tx) =>
+        tx.user.create({
+          data: {
+            qq: challenge.qq,
+            name: payload.name,
+            role: this.isAdminQq(challenge.qq) ? "ADMIN" : "USER",
+            ...(await this.registrationData(tx, payload.apply)),
+            passkeys: {
+              create: {
+                id: credential.id,
+                publicKey: Buffer.from(credential.publicKey),
+                counter: BigInt(credential.counter),
+                transports: credential.transports ?? [],
+                deviceType: credentialDeviceType,
+                backedUp: credentialBackedUp,
+              },
+            },
           },
-        },
-      },
-    });
-    if (payload.apply) await this.registration.apply(user.id, false);
-    return { accessToken: await this.accessToken(user), userId: user.id };
+        }),
+      );
+    } catch (error) {
+      this.registeredConflict(error);
+    }
+    return { accessToken: await this.accessToken(user!), userId: user!.id };
   }
 
   async passkeyAuthenticationOptions(rawQq: string) {
@@ -259,13 +307,16 @@ export class AuthService {
     });
     if (!verification.verified)
       throw new UnauthorizedException("Passkey 验证失败");
-    await this.prisma.passkey.update({
-      where: { id: passkey.id },
+    const updated = await this.prisma.passkey.updateMany({
+      where: { id: passkey.id, counter: passkey.counter },
       data: {
         counter: BigInt(verification.authenticationInfo.newCounter),
         lastUsedAt: new Date(),
       },
     });
+    if (updated.count !== 1) {
+      throw new UnauthorizedException("Passkey 计数器已被更新，请重试");
+    }
     return {
       accessToken: await this.accessToken(passkey.user),
       userId: passkey.user.id,

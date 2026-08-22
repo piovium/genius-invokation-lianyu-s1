@@ -6,16 +6,22 @@ import { DbModule } from "../db/db.module";
 import { AdminGuard } from "../auth/admin.guard";
 import {
   AdminTournamentsController,
+  ParticipantTournamentsController,
   TournamentGamesController,
 } from "./tournaments.controller";
 import { TournamentsService } from "./tournaments.service";
 import { RoomsModule } from "../rooms/rooms.module";
 import { DecksModule } from "../decks/decks.module";
+import { RegistrationModule } from "../registration/registration.module";
 
 @Module({
-  imports: [DbModule, RoomsModule, DecksModule],
+  imports: [DbModule, RoomsModule, DecksModule, RegistrationModule],
   providers: [TournamentsService, AdminGuard],
-  controllers: [AdminTournamentsController, TournamentGamesController],
+  controllers: [
+    AdminTournamentsController,
+    TournamentGamesController,
+    ParticipantTournamentsController,
+  ],
   exports: [TournamentsService],
 })
 export class TournamentsModule {}
