@@ -55,7 +55,13 @@ import {
   mergeWith,
   takeUntil,
 } from "rxjs";
-import { createGuestId, DeckVerificationError, GAME_DATA, GAME_VERSION_BEHAVIOR, verifyDeck } from "../utils";
+import {
+  createGuestId,
+  DeckVerificationError,
+  GAME_DATA,
+  GAME_VERSION_BEHAVIOR,
+  verifyDeck,
+} from "../utils";
 import {
   MetricsService,
   type RoomMetricsSnapshot,
@@ -119,6 +125,7 @@ type PlayerInfo = (
 ) & {
   name: string;
   deck: Deck;
+  deckId: number | null;
   avatarUrl?: string;
 };
 
@@ -465,6 +472,7 @@ class Room {
   private onStopHandlers: GameStopHandler[] = [];
   private startedAt: Date | null = null;
   private endedAt: Date | null = null;
+  private endReason: "NORMAL" | "ENGINE_ERROR" | "SURRENDER" = "NORMAL";
 
   constructor(
     public readonly id: number,
@@ -568,6 +576,7 @@ class Room {
         await game.start();
       } catch (e) {
         if (e instanceof GiTcgError) {
+          this.endReason = "ENGINE_ERROR";
           player0.onError(e);
           player1.onError(e);
           sendDebugLog("gameErrorLog", {
@@ -585,6 +594,7 @@ class Room {
   }
 
   giveUp(userId: PlayerId) {
+    this.endReason = "SURRENDER";
     if (this.players[0]?.playerInfo.id === userId) {
       this.game?.giveUp(0);
     } else if (this.players[1]?.playerInfo.id === userId) {
@@ -623,6 +633,14 @@ class Room {
         players,
       },
     };
+  }
+
+  getEndReason() {
+    return this.endReason;
+  }
+
+  getStartedAt() {
+    return this.startedAt;
   }
 
   getRoomInfo(): RoomInfo {
@@ -735,6 +753,7 @@ export class RoomsService {
       id: userId,
       name: user.name ?? user.login,
       deck,
+      deckId: deck.id,
     };
     const room = await this.createRoom(playerInfo, params);
     return { room };
@@ -747,6 +766,7 @@ export class RoomsService {
       id: playerId,
       name: params.name,
       deck: params.deck,
+      deckId: null,
       avatarUrl: params.avatarUrl,
     };
     const room = await this.createRoom(playerInfo, params);
@@ -879,6 +899,7 @@ export class RoomsService {
       id: userId,
       name: user.name ?? user.login,
       deck,
+      deckId: deck.id,
     };
     return this.joinRoom(playerInfo, roomId);
   }
@@ -890,6 +911,7 @@ export class RoomsService {
       id: playerId,
       name: params.name,
       deck: params.deck,
+      deckId: null,
       avatarUrl: params.avatarUrl,
     };
     await this.joinRoom(playerInfo, roomId);
@@ -938,7 +960,8 @@ export class RoomsService {
         return;
       }
       const players = room.getPlayers();
-      const gameData = JSON.stringify(room.getStateLog());
+      const stateLog = room.getStateLog();
+      const gameData = JSON.stringify(stateLog);
       if (s3) {
         const now = new Date().toISOString();
         const date = now.slice(0, 10);
@@ -957,21 +980,25 @@ export class RoomsService {
           );
         });
       }
-      if (players.some((p) => p.playerInfo.isGuest)) {
-        return;
-      }
-      const playerIds = players.map(
-        (player) => player.playerInfo.id,
-      ) as number[];
       const winnerWho = game.state.winner;
-      const winnerId = winnerWho === null ? null : playerIds[winnerWho]!;
-      this.games.addGame({
-        coreVersion: Room.CORE_VERSION,
-        gameVersion: room.config.gameVersion,
-        data: gameData,
-        winnerId,
-        playerIds,
-      });
+      this.games
+        .addGame({
+          coreVersion: Room.CORE_VERSION,
+          gameVersion: room.config.gameVersion,
+          stateLog,
+          winnerWho,
+          endReason: room.getEndReason(),
+          startedAt: room.getStartedAt(),
+          players: players.map(({ playerInfo }) => ({
+            userId: playerInfo.isGuest ? null : playerInfo.id,
+            deckId: playerInfo.deckId,
+            name: playerInfo.name,
+            deck: playerInfo.deck,
+          })),
+        })
+        .catch((error) => {
+          this.logger.error(`Failed to persist room ${room.id}: ${error}`);
+        });
     });
     room.start();
     try {
