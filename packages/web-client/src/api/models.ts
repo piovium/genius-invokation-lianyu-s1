@@ -13,16 +13,14 @@ export interface RegistrationSettings {
 }
 
 export interface Participant {
-  id: number;
   matchId: number;
   userId: number;
   who: number;
   status: "ACTIVE" | "WITHDRAWN";
-  user: { id: number; qq: string; name: string };
+  user: { id: number; qq?: string; name: string };
 }
 
 export interface GamePlayer {
-  id: number;
   gameId: number;
   who: number;
   userId: number | null;
@@ -47,6 +45,7 @@ export interface TournamentGame {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  runtimeStatus?: "WAITING" | "PLAYING" | "FINALIZING" | null;
   players: GamePlayer[];
 }
 

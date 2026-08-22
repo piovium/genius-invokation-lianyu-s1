@@ -51,7 +51,7 @@ CREATE TABLE "Passkey" (
     "userId" INTEGER NOT NULL,
     "publicKey" BYTEA NOT NULL,
     "counter" BIGINT NOT NULL,
-    "transports" TEXT[],
+    "transports" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     "deviceType" TEXT,
     "backedUp" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -91,6 +91,7 @@ CREATE TABLE "Deck" (
     "code" TEXT NOT NULL,
     "requiredVersion" INTEGER NOT NULL,
     "ownerUserId" INTEGER NOT NULL,
+    "clientImportKey" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -211,7 +212,7 @@ CREATE TABLE "AuditLog" (
 CREATE UNIQUE INDEX "User_qq_key" ON "User"("qq");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_activeMatchId_key" ON "User"("activeMatchId");
+CREATE INDEX "User_activeMatchId_idx" ON "User"("activeMatchId");
 
 -- CreateIndex
 CREATE INDEX "User_competitionStatus_appliedAt_idx" ON "User"("competitionStatus", "appliedAt");
@@ -224,6 +225,8 @@ CREATE INDEX "AuthChallenge_qq_kind_expiresAt_idx" ON "AuthChallenge"("qq", "kin
 
 -- CreateIndex
 CREATE INDEX "Deck_ownerUserId_updatedAt_idx" ON "Deck"("ownerUserId", "updatedAt");
+
+CREATE UNIQUE INDEX "Deck_ownerUserId_clientImportKey_key" ON "Deck"("ownerUserId", "clientImportKey");
 
 -- CreateIndex
 CREATE INDEX "TournamentEvent_phase_idx" ON "TournamentEvent"("phase");

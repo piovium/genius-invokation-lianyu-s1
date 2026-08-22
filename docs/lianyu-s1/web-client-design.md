@@ -334,6 +334,7 @@ Passkey 流程使用 `navigator.credentials.get()`。密码/Passkey错误统一�
 
 - `PENDING + runtimeStatus=null/WAITING`：未开始，可点击；
 - `PENDING + runtimeStatus=PLAYING`：进行中，本方可重连；
+- `PENDING + runtimeStatus=FINALIZING`：结算中，不显示进入按钮；
 - `FINISHED`：显示原始结果；若存在管理员结果，再单独显示“裁定结果”；
 - 非本方、已结束或条件不允许时不可进入。
 

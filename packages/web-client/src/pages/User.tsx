@@ -17,10 +17,16 @@ import { useParams } from "@solidjs/router";
 import { createResource, Switch, Match } from "solid-js";
 import { Layout } from "../layouts/Layout";
 import axios, { AxiosError } from "axios";
-import { useAuth, UserInfo as UserInfoT } from "../auth";
+import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { UserInfo } from "../components/UserInfo";
-import { getQqAvatarUrl } from "../utils";
+import { BACKEND_BASE_URL } from "../config";
+
+interface PublicUserInfo {
+  id: number;
+  name: string;
+  chessboardColor: string | null;
+}
 
 export default function User() {
   const { t } = useI18n();
@@ -35,7 +41,7 @@ export default function User() {
       } else {
         return await axios
           .get(`users/${params.id}`)
-          .then((res) => res.data as UserInfoT);
+          .then((res) => res.data as PublicUserInfo);
       }
     },
   );
@@ -67,9 +73,13 @@ export default function User() {
           {(user) => (
             <UserInfo
               type="user"
-              idText={`QQ: ${user().qq} · ${user().competitionStatus}`}
+              idText={`ID: ${user().id}`}
               name={user().name}
-              avatarUrl={user().avatarUrl || getQqAvatarUrl(user().qq)}
+              avatarUrl={
+                user().id === mine()?.id
+                  ? myAvatarUrl()
+                  : `${BACKEND_BASE_URL}/users/${user().id}/avatar`
+              }
               editable={user().id === mine()?.id}
               onSubmit={refetch}
             />

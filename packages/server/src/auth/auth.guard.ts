@@ -24,6 +24,7 @@ import { Reflector } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 import type { FastifyRequest } from "fastify";
 import { isUserJwtPayload } from "./user.decorator";
+import { PrismaService } from "../db/prisma.service";
 
 export const IS_PUBLIC_KEY: unique symbol = Symbol("isPublic");
 
@@ -41,6 +42,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private jwtService: JwtService,
     private reflector: Reflector,
+    private prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -61,10 +63,16 @@ export class AuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_SECRET,
       });
-      request.auth = payload;
       if (isUserJwtPayload(payload)) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: payload.sub },
+          select: { role: true },
+        });
+        if (!user) return isPublic;
+        request.auth = { ...payload, role: user.role };
         return true;
       }
+      request.auth = payload;
       return isPublic;
     } catch {
       return isPublic;

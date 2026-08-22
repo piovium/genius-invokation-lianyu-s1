@@ -21,6 +21,7 @@ import {
 import { PrismaService } from "../db/prisma.service";
 import type {
   CreateDeckDto,
+  ImportDeckDto,
   QueryDeckDto,
   UpdateDeckDto,
 } from "./decks.controller";
@@ -70,6 +71,13 @@ export class DecksService {
       // code,
       ...deck,
     };
+  }
+
+  private async lockMatch(
+    tx: Parameters<Parameters<PrismaService["$transaction"]>[0]>[0],
+    matchId: number,
+  ) {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(22002, ${matchId})`;
   }
 
   async createDeck(userId: number, deck: CreateDeckDto): Promise<DeckModel> {
@@ -152,17 +160,6 @@ export class DecksService {
   }
 
   async updateDeck(userId: number, deckId: number, deck: UpdateDeckDto) {
-    const selected = await this.prisma.matchDeck.findFirst({
-      where: {
-        sourceDeckId: deckId,
-        userId,
-        match: { event: { phase: { in: ["DECK_COLLECTION", "RUNNING"] } } },
-      },
-      include: { match: { include: { event: true } } },
-    });
-    if (selected?.match.event.phase === "RUNNING") {
-      throw new ConflictException("COMPETITION_DECK_LOCKED");
-    }
     let code: string | undefined;
     let requiredVersion: number | undefined;
     if (!deck.characters || !deck.cards) {
@@ -178,7 +175,22 @@ export class DecksService {
         characters: deck.characters,
         cards: deck.cards,
       }));
-      if (selected) {
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      if (user.activeMatchId) await this.lockMatch(tx, user.activeMatchId);
+      const selected = await tx.matchDeck.findFirst({
+        where: {
+          sourceDeckId: deckId,
+          userId,
+          match: { event: { phase: { in: ["DECK_COLLECTION", "RUNNING"] } } },
+        },
+        include: { match: { include: { event: true } } },
+      });
+      if (selected?.match.event.phase === "RUNNING") {
+        throw new ConflictException("COMPETITION_DECK_LOCKED");
+      }
+      if (selected && deck.characters) {
         const current = this.codeToDeck(selected.code);
         if (
           characterKey(current.characters) !== characterKey(deck.characters)
@@ -186,66 +198,81 @@ export class DecksService {
           throw new ConflictException("COMPETITION_DECK_CHARACTERS_LOCKED");
         }
       }
-    }
-    const model = await this.prisma.deck.update({
-      where: {
-        id: deckId,
-        ownerUserId: userId,
-      },
-      data: {
-        name: deck.name,
-        code,
-        requiredVersion,
-      },
-    });
-    if (selected) {
-      const decoded = this.codeToDeck(model.code);
-      await this.prisma.matchDeck.update({
-        where: { id: selected.id },
+      const model = await tx.deck.update({
+        where: { id: deckId, ownerUserId: userId },
         data: {
-          name: model.name,
-          code: model.code,
-          requiredVersion: model.requiredVersion,
-          deckJson: decoded as unknown as Prisma.InputJsonValue,
-          characterKey: characterKey(decoded.characters),
+          name: deck.name,
+          code,
+          requiredVersion,
         },
       });
-    }
-    return model;
+      if (selected) {
+        const decoded = this.codeToDeck(model.code);
+        await tx.matchDeck.update({
+          where: { id: selected.id },
+          data: {
+            name: model.name,
+            code: model.code,
+            requiredVersion: model.requiredVersion,
+            deckJson: decoded as unknown as Prisma.InputJsonValue,
+            characterKey: characterKey(decoded.characters),
+          },
+        });
+      }
+      return model;
+    });
   }
 
   async deleteDeck(userId: number, deckId: number) {
-    const selected = await this.prisma.matchDeck.findFirst({
-      where: {
-        sourceDeckId: deckId,
-        userId,
-        match: { event: { phase: { in: ["DECK_COLLECTION", "RUNNING"] } } },
-      },
-    });
-    if (selected) throw new ConflictException("COMPETITION_DECK_LOCKED");
-    await this.prisma.deck.delete({
-      where: {
-        id: deckId,
-        ownerUserId: userId,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      if (user.activeMatchId) await this.lockMatch(tx, user.activeMatchId);
+      const selected = await tx.matchDeck.findFirst({
+        where: {
+          sourceDeckId: deckId,
+          userId,
+          match: { event: { phase: { in: ["DECK_COLLECTION", "RUNNING"] } } },
+        },
+      });
+      if (selected) throw new ConflictException("COMPETITION_DECK_LOCKED");
+      await tx.deck.delete({ where: { id: deckId, ownerUserId: userId } });
     });
   }
 
-  async importDecks(userId: number, decks: CreateDeckDto[]) {
+  async importDecks(userId: number, decks: ImportDeckDto[]) {
     const results = [];
     for (const deck of decks) {
       const encoded = await this.deckToCode(deck);
-      const existing = await this.prisma.deck.findFirst({
-        where: { ownerUserId: userId, code: encoded.code, name: deck.name },
-      });
-      results.push(existing ?? (await this.createDeck(userId, deck)));
+      results.push(
+        await this.prisma.deck.upsert({
+          where: {
+            ownerUserId_clientImportKey: {
+              ownerUserId: userId,
+              clientImportKey: deck.clientImportKey,
+            },
+          },
+          create: {
+            ownerUserId: userId,
+            clientImportKey: deck.clientImportKey,
+            name: deck.name,
+            code: encoded.code,
+            requiredVersion: encoded.requiredVersion,
+          },
+          update: {},
+        }),
+      );
     }
     return { data: results, count: results.length };
   }
 
   async selectCompetitionDeck(userId: number, deckId: number) {
     return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      let user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      if (user.competitionStatus !== "PLAYER" || !user.activeMatchId) {
+        throw new ConflictException("EVENT_PHASE_MISMATCH");
+      }
+      await this.lockMatch(tx, user.activeMatchId);
+      user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
       if (user.competitionStatus !== "PLAYER" || !user.activeMatchId) {
         throw new ConflictException("EVENT_PHASE_MISMATCH");
       }
@@ -287,14 +314,25 @@ export class DecksService {
   }
 
   async unselectCompetitionDeck(userId: number, deckId: number) {
-    const selected = await this.prisma.matchDeck.findFirst({
-      where: { userId, sourceDeckId: deckId },
-      include: { match: { include: { event: true } } },
+    await this.prisma.$transaction(async (tx) => {
+      let user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      if (!user.activeMatchId) return;
+      await this.lockMatch(tx, user.activeMatchId);
+      user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      if (!user.activeMatchId) return;
+      const current = await tx.matchDeck.findFirst({
+        where: {
+          matchId: user.activeMatchId,
+          userId,
+          sourceDeckId: deckId,
+        },
+        include: { match: { include: { event: true } } },
+      });
+      if (!current) return;
+      if (current.match.event.phase !== "DECK_COLLECTION") {
+        throw new ConflictException("COMPETITION_DECK_LOCKED");
+      }
+      await tx.matchDeck.delete({ where: { id: current.id } });
     });
-    if (!selected) return;
-    if (selected.match.event.phase !== "DECK_COLLECTION") {
-      throw new ConflictException("COMPETITION_DECK_LOCKED");
-    }
-    await this.prisma.matchDeck.delete({ where: { id: selected.id } });
   }
 }
