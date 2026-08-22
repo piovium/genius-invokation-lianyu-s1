@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Guyutongxue
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { Prisma, type Game as GameModel } from "#prisma/client";
 import type { Deck } from "@gi-tcg/typings";
 import { PrismaService } from "../db/prisma.service";
@@ -86,15 +86,31 @@ export class GamesService {
     return { count, data };
   }
 
-  getGame(gameId: number) {
-    return this.prisma.game.findUnique({
-      where: { id: gameId },
-      include: {
-        players: {
-          include: { user: { select: { id: true, qq: true, name: true } } },
+  async getGame(gameId: number, viewerUserId: number) {
+    const [game, viewer] = await Promise.all([
+      this.prisma.game.findUnique({
+        where: { id: gameId },
+        include: {
+          players: {
+            include: { user: { select: { id: true, qq: true, name: true } } },
+          },
         },
-      },
-    });
+      }),
+      this.prisma.user.findUnique({
+        where: { id: viewerUserId },
+        select: { role: true },
+      }),
+    ]);
+    if (
+      game &&
+      viewer?.role !== "ADMIN" &&
+      !game.players.some((player) => player.userId === viewerUserId)
+    ) {
+      throw new ForbiddenException(
+        "Only participants and administrators can read state logs",
+      );
+    }
+    return game;
   }
 
   async gamesHasUser(userId: number, { skip = 0, take = 10 }: PaginationDto) {
