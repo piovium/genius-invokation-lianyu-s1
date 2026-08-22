@@ -81,6 +81,12 @@ export class AuthService {
   }) {
     const member = await this.qqGroup.findMember(input.qq, true);
     verifyRegistrationCode(member.qq, input.registrationCode);
+    if (await this.prisma.user.findUnique({ where: { qq: member.qq } })) {
+      throw new BusinessException("QQ_ALREADY_REGISTERED", "该 QQ 已注册", 409);
+    }
+    if (input.apply && !(await this.registration.settings()).isOpen) {
+      throw new BusinessException("REGISTRATION_CLOSED", "报名已经截止", 409);
+    }
     const passwordHash = await hash(input.password, {
       algorithm: 2,
       memoryCost: 19_456,
@@ -118,6 +124,9 @@ export class AuthService {
     verifyRegistrationCode(member.qq, input.registrationCode);
     if (await this.prisma.user.findUnique({ where: { qq: member.qq } })) {
       throw new BusinessException("QQ_ALREADY_REGISTERED", "该 QQ 已注册", 409);
+    }
+    if (input.apply && !(await this.registration.settings()).isOpen) {
+      throw new BusinessException("REGISTRATION_CLOSED", "报名已经截止", 409);
     }
     const options = await generateRegistrationOptions({
       rpName: this.rpName,
