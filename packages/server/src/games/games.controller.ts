@@ -33,7 +33,10 @@ export class GamesController {
   }
 
   @Get(":gameId")
-  async getGame(@Param("gameId", ParseIntPipe) gameId: number) {
-    return await this.games.getGame(gameId);
+  async getGame(
+    @User() userId: number,
+    @Param("gameId", ParseIntPipe) gameId: number,
+  ) {
+    return await this.games.getGame(gameId, userId);
   }
 }
