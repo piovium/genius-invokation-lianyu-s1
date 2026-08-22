@@ -23,6 +23,7 @@ import { Type, Transform } from "class-transformer";
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -30,8 +31,10 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from "@nestjs/common";
+import type { FastifyReply } from "fastify";
 import {
   CompetitionStatus,
   EventPhase,
@@ -44,6 +47,7 @@ import { parseStringToInt } from "../utils";
 import { TournamentsService } from "./tournaments.service";
 import { RoomsService } from "../rooms/rooms.service";
 import { DecksService } from "../decks/decks.service";
+import { RegistrationService } from "../registration/registration.service";
 
 export class ReasonDto {
   @IsString()
@@ -244,13 +248,27 @@ export class AdminTournamentsController {
   }
 
   @Patch("users/competition-status")
-  statuses(@User() actor: number, @Body() dto: StatusBatchDto) {
-    return this.tournaments.setUserStatuses(
+  async statuses(@User() actor: number, @Body() dto: StatusBatchDto) {
+    const result = await this.tournaments.setUserStatuses(
       actor,
       dto.userIds,
       dto.status,
       dto.reason,
     );
+    if (dto.status !== "PLAYER") {
+      for (const item of result.results) {
+        if (item.ok && "closedGameIds" in item) {
+          for (const gameId of item.closedGameIds) {
+            const stateLog = this.rooms.terminateTournamentGame(gameId, true);
+            if (stateLog) {
+              await this.tournaments.attachAdminStateLog(gameId, stateLog);
+            }
+          }
+          this.rooms.terminateWaitingTournamentRoomsForUser(item.userId);
+        }
+      }
+    }
+    return result;
   }
 
   @Get("events")
@@ -283,24 +301,27 @@ export class AdminTournamentsController {
     @Param("id", ParseIntPipe) id: number,
     @Body() { reason }: ReasonDto,
   ) {
-    const event = await this.tournaments.event(id);
-    const pendingGameIds =
-      event?.matches.flatMap((match) =>
-        match.games
-          .filter((game) => game.status === "PENDING")
-          .map((game) => game.id),
-      ) ?? [];
     const result = await this.tournaments.advanceEvent(actor, id, reason);
     if (result.phase === "FINISHED") {
-      for (const gameId of pendingGameIds) {
-        this.rooms.terminateTournamentGame(gameId);
+      for (const gameId of result.closedGameIds) {
+        const stateLog = this.rooms.terminateTournamentGame(gameId, true);
+        if (stateLog) {
+          await this.tournaments.attachAdminStateLog(gameId, stateLog);
+        }
       }
     }
     return result;
   }
 
   @Get("events/:id/export")
-  exportEvent(@Param("id", ParseIntPipe) id: number) {
+  exportEvent(
+    @Param("id", ParseIntPipe) id: number,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="event-${id}-${Date.now()}.json"`,
+    );
     return this.tournaments.exportEvent(id);
   }
 
@@ -362,13 +383,15 @@ export class AdminTournamentsController {
   }
 
   @Patch("games/:id/intervention")
-  gameIntervention(
+  async gameIntervention(
     @User() actor: number,
     @Param("id", ParseIntPipe) id: number,
     @Body() dto: GameInterventionDto,
   ) {
-    this.rooms.terminateTournamentGame(id);
-    return this.tournaments.interveneGame(actor, id, dto);
+    const result = await this.tournaments.interveneGame(actor, id, dto);
+    const stateLog = this.rooms.terminateTournamentGame(id, true);
+    if (stateLog) await this.tournaments.attachAdminStateLog(id, stateLog);
+    return result;
   }
 
   @Get("audit-logs")
@@ -403,11 +426,56 @@ export class TournamentGamesController {
     return this.rooms.joinTournamentGame({
       ...roomData,
       roomConfig: roomData.roomConfig,
+      ensurePending: () => this.tournaments.assertGameJoinable(id, userId),
+      markStarted: () => this.tournaments.markGameStarted(id),
       finalize: (result) =>
         this.tournaments.finalizeGame({
           gameId: id,
           ...result,
         }),
     });
+  }
+}
+
+@Controller("users/me")
+export class ParticipantTournamentsController {
+  constructor(
+    private readonly tournaments: TournamentsService,
+    private readonly rooms: RoomsService,
+    private readonly registration: RegistrationService,
+  ) {}
+
+  @Delete("registration")
+  async withdraw(@User() userId: number) {
+    const result = await this.registration.withdraw(userId);
+    for (const gameId of result.closedGameIds) {
+      const stateLog = this.rooms.terminateTournamentGame(gameId, true);
+      if (stateLog) {
+        await this.tournaments.attachAdminStateLog(gameId, stateLog);
+      }
+    }
+    this.rooms.terminateWaitingTournamentRoomsForUser(userId);
+    return result;
+  }
+
+  @Get("matches")
+  async matches(@User() userId: number) {
+    const matches = await this.tournaments.activeMatches(userId);
+    return matches
+      .filter(
+        (match) =>
+          match.games.filter((game) => game.status === "FINISHED").length <
+            match.maxGames ||
+          match.participants.filter(
+            (participant) => participant.status === "ACTIVE",
+          ).length === 1,
+      )
+      .map((match) => ({
+        ...match,
+        games: match.games.map((game) => ({
+          ...game,
+          runtimeStatus: this.rooms.tournamentRuntimeStatus(game.id),
+        })),
+      }));
   }
 }

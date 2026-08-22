@@ -12,6 +12,7 @@ import { PrismaService } from "../db/prisma.service";
 import { BusinessException } from "../errors";
 import { ASSETS_MANAGER, MATCH_CONFIG_VERSION } from "../utils";
 import { characterKey } from "../decks/decks.service";
+import { isPlayerInRunningRoom } from "../rooms/room-runtime";
 import type {
   CreateEventDto,
   EventPatchDto,
@@ -31,7 +32,17 @@ export class TournamentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async lock(tx: Tx, matchId: number) {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(${matchId})`;
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(22002, ${matchId})`;
+  }
+
+  private async lockEvent(tx: Tx, eventId: number) {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(22003, ${eventId})`;
+  }
+
+  private async lockUsers(tx: Tx, userIds: readonly number[]) {
+    for (const userId of [...userIds].sort((a, b) => a - b)) {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(22001, ${userId})`;
+    }
   }
 
   private audit(
@@ -93,6 +104,7 @@ export class TournamentsService {
     }
     if (ids.length === 0) throw new ConflictException("No players selected");
     return this.prisma.$transaction(async (tx) => {
+      await this.lockUsers(tx, ids);
       const users = await tx.user.findMany({
         where: { id: { in: ids } },
         select: { id: true, competitionStatus: true, activeMatchId: true },
@@ -197,6 +209,7 @@ export class TournamentsService {
 
   async patchEvent(actorUserId: number, id: number, dto: EventPatchDto) {
     return this.prisma.$transaction(async (tx) => {
+      await this.lockEvent(tx, id);
       const before = await tx.tournamentEvent.findUniqueOrThrow({
         where: { id },
       });
@@ -225,18 +238,42 @@ export class TournamentsService {
 
   async advanceEvent(actorUserId: number, id: number, reason: string) {
     return this.prisma.$transaction(async (tx) => {
+      await this.lockEvent(tx, id);
       const event = await tx.tournamentEvent.findUniqueOrThrow({
         where: { id },
         include: { matches: true },
       });
+      for (const match of [...event.matches].sort((a, b) => a.id - b.id)) {
+        await this.lock(tx, match.id);
+      }
       if (event.phase === "FINISHED")
         throw new ConflictException("EVENT_PHASE_MISMATCH");
       const next = event.phase === "DECK_COLLECTION" ? "RUNNING" : "FINISHED";
+      let closedGameIds: number[] = [];
       if (next === "RUNNING") {
-        await tx.matchDeck.updateMany({
+        const selectedDecks = await tx.matchDeck.findMany({
           where: { match: { eventId: id } },
-          data: { frozenAt: new Date() },
+          include: { sourceDeck: true },
         });
+        const frozenAt = new Date();
+        for (const selected of selectedDecks) {
+          const source = selected.sourceDeck;
+          if (!source) {
+            throw new ConflictException("COMPETITION_DECK_SOURCE_MISSING");
+          }
+          const decoded = ASSETS_MANAGER.decode(source.code);
+          await tx.matchDeck.update({
+            where: { id: selected.id },
+            data: {
+              name: source.name,
+              code: source.code,
+              requiredVersion: source.requiredVersion,
+              deckJson: json(decoded),
+              characterKey: characterKey(decoded.characters),
+              frozenAt,
+            },
+          });
+        }
         await tx.tournamentEvent.update({
           where: { id },
           data: { phase: next },
@@ -246,6 +283,12 @@ export class TournamentsService {
             await this.createNextGameTx(tx, match.id, true);
         }
       } else {
+        closedGameIds = (
+          await tx.game.findMany({
+            where: { match: { eventId: id }, status: "PENDING" },
+            select: { id: true },
+          })
+        ).map((game) => game.id);
         await tx.game.updateMany({
           where: { match: { eventId: id }, status: "PENDING" },
           data: {
@@ -278,7 +321,7 @@ export class TournamentsService {
         { phase: event.phase },
         { phase: next },
       );
-      return { id, phase: next };
+      return { id, phase: next, closedGameIds };
     });
   }
 
@@ -300,7 +343,13 @@ export class TournamentsService {
   }
 
   async patchMatch(actorUserId: number, id: number, dto: MatchPatchDto) {
+    const current = await this.prisma.tournamentMatch.findUniqueOrThrow({
+      where: { id },
+      select: { eventId: true },
+    });
     return this.prisma.$transaction(async (tx) => {
+      await this.lockEvent(tx, current.eventId);
+      await this.lock(tx, id);
       const before = await tx.tournamentMatch.findUniqueOrThrow({
         where: { id },
         include: { event: true },
@@ -422,6 +471,11 @@ export class TournamentsService {
       throw new NotFoundException();
     const player = game.players.find((item) => item.userId === userId);
     if (!player) throw new NotFoundException();
+    const participant = await this.prisma.matchParticipant.findUnique({
+      where: { matchId_userId: { matchId: game.matchId!, userId } },
+      select: { status: true },
+    });
+    if (participant?.status !== "ACTIVE") throw new NotFoundException();
     const decks =
       game.match.mode === "UNRESTRICTED"
         ? await this.prisma.deck.findMany({ where: { ownerUserId: userId } })
@@ -438,7 +492,13 @@ export class TournamentsService {
   }
 
   async chooseDeck(gameId: number, userId: number, deckId: number) {
+    const current = await this.prisma.game.findUniqueOrThrow({
+      where: { id: gameId },
+      select: { matchId: true },
+    });
+    if (!current.matchId) throw new ConflictException("Not a tournament game");
     return this.prisma.$transaction(async (tx) => {
+      await this.lock(tx, current.matchId!);
       const game = await tx.game.findUniqueOrThrow({
         where: { id: gameId },
         include: { match: true, players: true },
@@ -447,6 +507,11 @@ export class TournamentsService {
         throw new ConflictException("MATCH_COMPLETED");
       const player = game.players.find((item) => item.userId === userId);
       if (!player) throw new NotFoundException();
+      const participant = await tx.matchParticipant.findUnique({
+        where: { matchId_userId: { matchId: game.matchId!, userId } },
+        select: { status: true },
+      });
+      if (participant?.status !== "ACTIVE") throw new NotFoundException();
       let snapshot: {
         id: number;
         name: string;
@@ -485,27 +550,60 @@ export class TournamentsService {
           );
         snapshot = matchDeck;
       }
+      const selectedDeckId = snapshot.sourceDeckId;
+      const selectedMatchDeckId = snapshot.id || null;
+      if (player.deckJson !== null) {
+        if (
+          player.deckId === selectedDeckId &&
+          player.matchDeckId === selectedMatchDeckId
+        ) {
+          return { gameId, who: player.who, ready: true };
+        }
+        throw new BusinessException(
+          "TOURNAMENT_DECK_ALREADY_SELECTED",
+          "本局牌组已经锁定",
+          409,
+        );
+      }
       await tx.gamePlayer.update({
         where: { gameId_who: { gameId, who: player.who } },
         data: {
-          deckId: snapshot.sourceDeckId,
-          matchDeckId: snapshot.id || null,
+          deckId: selectedDeckId,
+          matchDeckId: selectedMatchDeckId,
           deckName: snapshot.name,
           deckJson: json(snapshot.deckJson),
           characterKey: snapshot.characterKey,
         },
       });
-      const players = await tx.gamePlayer.findMany({ where: { gameId } });
-      if (
-        players.length === 2 &&
-        players.every((item) => item.deckJson !== null)
-      ) {
-        await tx.game.update({
-          where: { id: gameId },
-          data: { startedAt: game.startedAt ?? new Date() },
-        });
-      }
       return { gameId, who: player.who, ready: true };
+    });
+  }
+
+  async markGameStarted(gameId: number) {
+    const current = await this.prisma.game.findUniqueOrThrow({
+      where: { id: gameId },
+      select: { matchId: true },
+    });
+    if (!current.matchId) throw new ConflictException("Not a tournament game");
+    return this.prisma.$transaction(async (tx) => {
+      await this.lock(tx, current.matchId!);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: { players: true },
+      });
+      if (game.status !== "PENDING") {
+        throw new ConflictException("MATCH_COMPLETED");
+      }
+      if (
+        game.players.length !== 2 ||
+        game.players.some((player) => player.deckJson === null)
+      ) {
+        throw new ConflictException("TOURNAMENT_DECK_NOT_SELECTED");
+      }
+      return tx.game.update({
+        where: { id: gameId },
+        data: { startedAt: game.startedAt ?? new Date() },
+      });
     });
   }
 
@@ -515,18 +613,29 @@ export class TournamentsService {
       include: {
         match: true,
         players: {
-          where: { userId },
-          include: { user: { select: { name: true, qq: true } } },
+          include: { user: { select: { id: true, name: true, qq: true } } },
+          orderBy: { who: "asc" },
         },
       },
     });
     if (!game.match || game.status !== "PENDING") {
       throw new ConflictException("MATCH_COMPLETED");
     }
-    const player = game.players[0];
+    const player = game.players.find((item) => item.userId === userId);
     if (!player?.deckJson || !player.user) {
       throw new ConflictException("TOURNAMENT_DECK_NOT_SELECTED");
     }
+    if (
+      game.players.length !== 2 ||
+      game.players.some((item) => item.userId === null)
+    ) {
+      throw new ConflictException("MATCH_REQUIRES_TWO_PLAYERS");
+    }
+    const participant = await this.prisma.matchParticipant.findUnique({
+      where: { matchId_userId: { matchId: game.matchId!, userId } },
+      select: { status: true },
+    });
+    if (participant?.status !== "ACTIVE") throw new NotFoundException();
     return {
       gameId,
       userId,
@@ -538,8 +647,38 @@ export class TournamentsService {
         characters: number[];
         cards: number[];
       },
+      expectedUserIds: game.players.map((item) => item.userId) as [
+        number,
+        number,
+      ],
       roomConfig: game.match.roomConfig as Record<string, unknown>,
     };
+  }
+
+  async assertGameJoinable(gameId: number, userId: number) {
+    const current = await this.prisma.game.findUniqueOrThrow({
+      where: { id: gameId },
+      select: { matchId: true },
+    });
+    if (!current.matchId) throw new ConflictException("Not a tournament game");
+    return this.prisma.$transaction(async (tx) => {
+      await this.lock(tx, current.matchId!);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: { players: true },
+      });
+      if (game.status !== "PENDING") {
+        throw new ConflictException("MATCH_COMPLETED");
+      }
+      if (!game.players.some((player) => player.userId === userId)) {
+        throw new NotFoundException();
+      }
+      const participant = await tx.matchParticipant.findUnique({
+        where: { matchId_userId: { matchId: current.matchId!, userId } },
+        select: { status: true },
+      });
+      if (participant?.status !== "ACTIVE") throw new NotFoundException();
+    });
   }
 
   async finalizeGame(input: {
@@ -559,7 +698,12 @@ export class TournamentsService {
         where: { id: input.gameId },
         include: { players: true, match: true },
       });
-      if (game.status === "FINISHED" && game.endReason === "ADMIN") return game;
+      if (game.status === "FINISHED" && game.endReason === "ADMIN") {
+        return tx.game.update({
+          where: { id: game.id },
+          data: { stateLog: json(input.stateLog) },
+        });
+      }
       const updated = await tx.game.update({
         where: { id: game.id },
         data: {
@@ -655,8 +799,20 @@ export class TournamentsService {
       await this.lock(tx, matchId);
       const match = await tx.tournamentMatch.findUniqueOrThrow({
         where: { id: matchId },
-        include: { participants: { where: { status: "ACTIVE" } } },
+        include: {
+          event: true,
+          participants: { where: { status: "ACTIVE" } },
+          games: { select: { status: true } },
+        },
       });
+      if (match.event.phase !== "RUNNING")
+        throw new ConflictException("EVENT_PHASE_MISMATCH");
+      if (
+        match.winnerUserId !== null ||
+        match.games.some((game) => game.status === "PENDING")
+      ) {
+        throw new ConflictException("MATCH_COMPLETED");
+      }
       if (match.participants.length !== 1)
         throw new ConflictException("MATCH_NOT_A_BYE");
       const before = { winnerUserId: match.winnerUserId };
@@ -766,6 +922,13 @@ export class TournamentsService {
     });
   }
 
+  async attachAdminStateLog(gameId: number, stateLog: unknown) {
+    return this.prisma.game.updateMany({
+      where: { id: gameId, endReason: "ADMIN" },
+      data: { stateLog: json(stateLog) },
+    });
+  }
+
   async assignDeck(
     actorUserId: number,
     matchId: number,
@@ -774,6 +937,7 @@ export class TournamentsService {
     reason: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
+      await this.lock(tx, matchId);
       const match = await tx.tournamentMatch.findUniqueOrThrow({
         where: { id: matchId },
         include: { event: true },
@@ -820,6 +984,33 @@ export class TournamentsService {
         created,
       );
       return created;
+    });
+  }
+
+  activeMatches(userId: number) {
+    return this.prisma.tournamentMatch.findMany({
+      where: {
+        event: { phase: { in: ["DECK_COLLECTION", "RUNNING"] } },
+        winnerUserId: null,
+        participants: { some: { userId, status: "ACTIVE" } },
+      },
+      include: {
+        event: true,
+        participants: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { who: "asc" },
+        },
+        games: {
+          include: {
+            players: {
+              select: { gameId: true, who: true, userId: true },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        matchDecks: { where: { userId } },
+      },
+      orderBy: { scheduledStart: "desc" },
     });
   }
 
@@ -871,7 +1062,7 @@ export class TournamentsService {
         activeMatchId: true,
         createdAt: true,
       },
-      orderBy: { appliedAt: descending ? "desc" : "asc" },
+      orderBy: [{ appliedAt: descending ? "desc" : "asc" }, { id: "asc" }],
     });
   }
 
@@ -884,24 +1075,50 @@ export class TournamentsService {
     const results = [];
     for (const userId of userIds) {
       try {
+        if (status !== "PLAYER" && isPlayerInRunningRoom(userId)) {
+          throw new BusinessException(
+            "USER_IN_RUNNING_GAME",
+            "用户仍在进行中的对局里",
+            409,
+          );
+        }
         const result = await this.prisma.$transaction(async (tx) => {
+          await this.lockUsers(tx, [userId]);
           const before = await tx.user.findUniqueOrThrow({
             where: { id: userId },
           });
+          let closedGameIds: number[] = [];
           if (status !== "PLAYER" && before.activeMatchId) {
-            const open = await tx.game.findFirst({
-              where: { matchId: before.activeMatchId, status: "PENDING" },
-            });
-            if (open)
+            await this.lock(tx, before.activeMatchId);
+            if (isPlayerInRunningRoom(userId)) {
               throw new BusinessException(
                 "USER_IN_RUNNING_GAME",
-                "用户仍在开放对局中",
+                "用户仍在进行中的对局里",
                 409,
-                { gameId: open.id },
               );
+            }
             await tx.matchParticipant.updateMany({
               where: { matchId: before.activeMatchId, userId },
               data: { status: "WITHDRAWN" },
+            });
+            closedGameIds = (
+              await tx.game.findMany({
+                where: { matchId: before.activeMatchId, status: "PENDING" },
+                select: { id: true },
+              })
+            ).map((game) => game.id);
+            await tx.game.updateMany({
+              where: { matchId: before.activeMatchId, status: "PENDING" },
+              data: {
+                status: "FINISHED",
+                endReason: "ADMIN",
+                countForStats: false,
+                finishedAt: new Date(),
+              },
+            });
+            await tx.tournamentMatch.update({
+              where: { id: before.activeMatchId },
+              data: { autoCreateGame: false },
             });
           }
           const after = await tx.user.update({
@@ -931,9 +1148,9 @@ export class TournamentsService {
               activeMatchId: after.activeMatchId,
             },
           );
-          return after;
+          return { user: after, closedGameIds };
         });
-        results.push({ userId, ok: true, user: result });
+        results.push({ userId, ok: true, ...result });
       } catch (error) {
         results.push({
           userId,
