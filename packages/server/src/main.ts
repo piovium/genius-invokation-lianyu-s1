@@ -32,7 +32,13 @@ const app = await NestFactory.create<NestFastifyApplication>(
     requestTimeout: 0, // Disable request timeout for SSE
   }),
 );
-app.useGlobalPipes(new ValidationPipe({ transform: true }));
+app.useGlobalPipes(
+  new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  }),
+);
 app.useGlobalFilters(new PrismaClientExceptionFilter(app.getHttpAdapter()));
 app.setGlobalPrefix(`${WEB_CLIENT_BASE_PATH}api`, {
   exclude: [{ path: "metrics", method: RequestMethod.GET }],

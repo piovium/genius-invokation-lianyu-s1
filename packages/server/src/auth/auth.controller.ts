@@ -1,63 +1,107 @@
-// Copyright (C) 2024-2025 Guyutongxue
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024-2026 Guyutongxue
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
 import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Query,
-  Req,
-  Res,
-} from "@nestjs/common";
-import type { FastifyReply, FastifyRequest } from "fastify";
-import { IsNotEmpty } from "class-validator";
+  IsBoolean,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  MinLength,
+} from "class-validator";
+import type {
+  AuthenticationResponseJSON,
+  RegistrationResponseJSON,
+} from "@simplewebauthn/server";
 import { AuthService } from "./auth.service";
 import { Public } from "./auth.guard";
-import { SERVER_HOST } from "@gi-tcg/config";
 
-class GitHubCallbackDto {
-  @IsNotEmpty()
-  code!: string;
+class QqDto {
+  @Matches(/^\d{5,12}$/)
+  qq!: string;
 }
 
+class RegistrationDto extends QqDto {
+  @IsString()
+  @IsNotEmpty()
+  registrationCode!: string;
+
+  @Length(1, 64)
+  name!: string;
+
+  @IsBoolean()
+  @IsOptional()
+  apply?: boolean;
+}
+
+class PasswordRegistrationDto extends RegistrationDto {
+  @MinLength(8)
+  password!: string;
+}
+
+class PasswordLoginDto extends QqDto {
+  @IsString()
+  @IsNotEmpty()
+  password!: string;
+}
+
+class PasskeyResponseDto {
+  @IsString()
+  @IsNotEmpty()
+  challengeId!: string;
+
+  @IsObject()
+  response!: RegistrationResponseJSON | AuthenticationResponseJSON;
+}
+
+@Public()
 @Controller("auth")
 export class AuthController {
-  constructor(private auth: AuthService) {}
+  constructor(private readonly auth: AuthService) {}
 
-  @Public()
+  @Post("registration/qq-check")
+  qqCheck(@Body() { qq }: QqDto) {
+    return this.auth.checkQq(qq);
+  }
+
+  @Post("register/password")
+  registerPassword(@Body() dto: PasswordRegistrationDto) {
+    return this.auth.registerPassword(dto);
+  }
+
+  @Post("register/passkey/options")
+  registerPasskeyOptions(@Body() dto: RegistrationDto) {
+    return this.auth.passkeyRegistrationOptions(dto);
+  }
+
+  @Post("register/passkey/verify")
+  registerPasskeyVerify(@Body() dto: PasskeyResponseDto) {
+    return this.auth.verifyPasskeyRegistration(
+      dto.challengeId,
+      dto.response as RegistrationResponseJSON,
+    );
+  }
+
   @HttpCode(HttpStatus.OK)
-  @Get("github/callback")
-  async login(
-    @Query() { code }: GitHubCallbackDto,
-    @Res() res: FastifyReply,
-  ) {
-    const { accessToken } = await this.auth.login(code);
-    res.type("text/html").send(
-      `<!DOCTYPE html>
-<title>Login Success</title>
-<p>Redirecting back...</p>
-<script>
-  window.addEventListener("error", (event) => {
-    document.body.innerHTML += \`\${event.type}: \${event.message}\\n\`;
-  });
-  window.opener.postMessage({ type: "login", token: "${accessToken}" }, "*");
-  window.close();
-</script>`,
+  @Post("login/password")
+  loginPassword(@Body() dto: PasswordLoginDto) {
+    return this.auth.loginPassword(dto.qq, dto.password);
+  }
+
+  @Post("login/passkey/options")
+  loginPasskeyOptions(@Body() dto: QqDto) {
+    return this.auth.passkeyAuthenticationOptions(dto.qq);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post("login/passkey/verify")
+  loginPasskeyVerify(@Body() dto: PasskeyResponseDto) {
+    return this.auth.verifyPasskeyAuthentication(
+      dto.challengeId,
+      dto.response as AuthenticationResponseJSON,
     );
   }
 }

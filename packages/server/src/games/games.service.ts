@@ -1,51 +1,62 @@
-// Copyright (C) 2024-2025 Guyutongxue
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024-2026 Guyutongxue
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { Injectable } from "@nestjs/common";
+import { Prisma, type Game as GameModel } from "#prisma/client";
+import type { Deck } from "@gi-tcg/typings";
 import { PrismaService } from "../db/prisma.service";
-import type { Game as GameModel, PlayerOnGames } from "#prisma/client";
 import type { PaginationDto, PaginationResult } from "../utils";
 import { MetricsService } from "../metrics/metrics.service";
+import { characterKey } from "../decks/decks.service";
 
 export interface AddGameOption {
-  playerIds: number[];
+  players: {
+    userId: number | null;
+    deckId: number | null;
+    name: string;
+    deck: Deck;
+  }[];
   coreVersion: string;
   gameVersion: string;
-  data: string;
-  winnerId: number | null;
+  stateLog: unknown;
+  winnerWho: number | null;
+  endReason?: "NORMAL" | "ENGINE_ERROR" | "SURRENDER";
+  countForStats?: boolean;
+  startedAt?: Date | null;
+  finishedAt?: Date;
 }
 
-interface GameNoData extends Omit<GameModel, "data"> {}
+interface GameNoLog extends Omit<GameModel, "stateLog"> {}
 
 @Injectable()
 export class GamesService {
   constructor(
-    private prisma: PrismaService,
-    private metrics: MetricsService,
+    private readonly prisma: PrismaService,
+    private readonly metrics: MetricsService,
   ) {}
 
-  async addGame({ playerIds, ...data }: AddGameOption): Promise<GameModel> {
-    const playerOnGames = playerIds.map((id, who) => ({
-      playerId: id,
-      who,
-    }));
+  async addGame(input: AddGameOption): Promise<GameModel> {
     const game = await this.prisma.game.create({
       data: {
-        ...data,
+        status: "FINISHED",
+        coreVersion: input.coreVersion,
+        gameVersion: input.gameVersion,
+        stateLog: input.stateLog as Prisma.InputJsonValue,
+        winnerWho: input.winnerWho,
+        endReason: input.endReason ?? "NORMAL",
+        countForStats:
+          input.countForStats ?? input.endReason !== "ENGINE_ERROR",
+        startedAt: input.startedAt,
+        finishedAt: input.finishedAt ?? new Date(),
         players: {
-          create: playerOnGames,
+          create: input.players.map((player, who) => ({
+            who,
+            userId: player.userId,
+            deckId: player.deckId,
+            deckName: player.name,
+            deckJson: player.deck as unknown as Prisma.InputJsonValue,
+            characterKey: characterKey(player.deck.characters),
+          })),
         },
       },
     });
@@ -56,72 +67,43 @@ export class GamesService {
   async getAllGames({
     skip = 0,
     take = 10,
-  }: PaginationDto): Promise<PaginationResult<GameNoData>> {
+  }: PaginationDto): Promise<PaginationResult<GameNoLog>> {
     const [data, count] = await this.prisma.game.findManyAndCount({
       skip,
       take,
-      omit: { data: true },
+      omit: { stateLog: true },
       include: {
         players: {
           select: {
-            player: {
-              select: {
-                id: true,
-              },
-            },
+            user: { select: { id: true, qq: true, name: true } },
             who: true,
+            deckName: true,
           },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
     });
     return { count, data };
   }
 
-  async getGame(gameId: number) {
-    return await this.prisma.game.findFirst({
-      where: {
-        id: gameId,
-      },
+  getGame(gameId: number) {
+    return this.prisma.game.findUnique({
+      where: { id: gameId },
       include: {
         players: {
-          select: {
-            player: {
-              select: {
-                id: true,
-              },
-            },
-            who: true,
-          },
+          include: { user: { select: { id: true, qq: true, name: true } } },
         },
       },
     });
   }
 
-  async gamesHasUser(
-    userId: number,
-    { skip = 0, take = 10 }: PaginationDto,
-  ): Promise<PaginationResult<PlayerOnGames & { game: GameNoData }>> {
-    const [data, count] = await this.prisma.playerOnGames.findManyAndCount({
+  async gamesHasUser(userId: number, { skip = 0, take = 10 }: PaginationDto) {
+    const [data, count] = await this.prisma.gamePlayer.findManyAndCount({
       skip,
       take,
-      where: {
-        playerId: userId,
-      },
-      include: {
-        game: {
-          omit: {
-            data: true,
-          },
-        },
-      },
-      orderBy: {
-        game: {
-          createdAt: "desc",
-        },
-      },
+      where: { userId },
+      include: { game: { omit: { stateLog: true } } },
+      orderBy: { game: { createdAt: "desc" } },
     });
     return { data, count };
   }
