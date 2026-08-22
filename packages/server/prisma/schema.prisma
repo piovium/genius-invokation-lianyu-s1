@@ -1,20 +1,5 @@
-// Copyright (C) 2024-2025 Guyutongxue
-// 
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-// 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-// 
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Copyright (C) 2024-2026 Guyutongxue
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 generator client {
   provider   = "prisma-client"
@@ -27,43 +12,260 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum CompetitionStatus {
+  NONE
+  REGISTERED
+  PLAYER
+}
+
+enum EventPhase {
+  DECK_COLLECTION
+  RUNNING
+  FINISHED
+}
+
+enum MatchMode {
+  UNRESTRICTED
+  DUEL
+  CONQUEST
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  WITHDRAWN
+}
+
+enum GameStatus {
+  PENDING
+  FINISHED
+}
+
+enum GameEndReason {
+  NORMAL
+  ENGINE_ERROR
+  SURRENDER
+  ADMIN
+}
+
+enum MatchDeckDisableReason {
+  DUEL_USED
+  CONQUEST_WINNER_USED
+  ADMIN
+}
+
+enum AuthChallengeKind {
+  REGISTRATION
+  AUTHENTICATION
+}
+
 model User {
-  id              Int             @id
-  name            String?
-  chessboardColor String?
-  ghToken         String?
-  games           PlayerOnGames[]
-  createdAt       DateTime        @default(now())
-  decks           Deck[]
+  id                Int                @id @default(autoincrement())
+  qq                String             @unique
+  name              String
+  chessboardColor   String?
+  passwordHash      String?
+  role              UserRole           @default(USER)
+  competitionStatus CompetitionStatus  @default(NONE)
+  appliedAt         DateTime?
+  activeMatchId     Int?               @unique
+  activeMatch       TournamentMatch?   @relation("ActiveMatch", fields: [activeMatchId], references: [id], onDelete: SetNull)
+  passkeys          Passkey[]
+  decks             Deck[]
+  gamePlayers       GamePlayer[]
+  matchParticipants MatchParticipant[]
+  matchDecks        MatchDeck[]
+  wonMatches        TournamentMatch[]  @relation("MatchWinner")
+  auditLogs         AuditLog[]         @relation("AuditActor")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([competitionStatus, appliedAt])
 }
 
-model Game {
-  id          Int             @id @default(autoincrement())
-  players     PlayerOnGames[]
-  coreVersion String
-  gameVersion String
-  data        Json // JSON log
-  winnerId    Int?
-  createdAt   DateTime        @default(now())
+model Passkey {
+  id         String    @id
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicKey  Bytes
+  counter    BigInt
+  transports String[]
+  deviceType String?
+  backedUp   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }
 
-model PlayerOnGames {
-  player   User @relation(fields: [playerId], references: [id])
-  playerId Int
-  game     Game @relation(fields: [gameId], references: [id])
-  gameId   Int
-  who      Int
+model AuthChallenge {
+  id        String            @id
+  kind      AuthChallengeKind
+  qq        String
+  challenge String
+  payload   Json?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime          @default(now())
 
-  @@id([playerId, gameId])
+  @@index([qq, kind, expiresAt])
+}
+
+model RegistrationSetting {
+  id        Int       @id @default(1)
+  cutoffAt  DateTime?
+  limit     Int       @default(0)
+  updatedAt DateTime  @updatedAt
 }
 
 model Deck {
-  id              Int      @id @default(autoincrement())
+  id              Int          @id @default(autoincrement())
   name            String
   code            String
   requiredVersion Int
-  owner           User     @relation(fields: [ownerUserId], references: [id])
+  owner           User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   ownerUserId     Int
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  matchDecks      MatchDeck[]
+  gamePlayers     GamePlayer[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([ownerUserId, updatedAt])
+}
+
+model TournamentEvent {
+  id        Int               @id @default(autoincrement())
+  name      String
+  phase     EventPhase        @default(DECK_COLLECTION)
+  deckLimit Int               @default(0)
+  matches   TournamentMatch[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([phase])
+}
+
+model TournamentMatch {
+  id             Int                @id @default(autoincrement())
+  eventId        Int
+  event          TournamentEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  mode           MatchMode          @default(UNRESTRICTED)
+  roomConfig     Json
+  maxGames       Int
+  winsRequired   Int
+  winnerUserId   Int?
+  winner         User?              @relation("MatchWinner", fields: [winnerUserId], references: [id], onDelete: SetNull)
+  autoCreateGame Boolean            @default(false)
+  participants   MatchParticipant[]
+  matchDecks     MatchDeck[]
+  games          Game[]
+  activeUsers    User[]             @relation("ActiveMatch")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([eventId])
+  @@index([winnerUserId])
+}
+
+model MatchParticipant {
+  matchId   Int
+  match     TournamentMatch   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  who       Int
+  status    ParticipantStatus @default(ACTIVE)
+  createdAt DateTime          @default(now())
+
+  @@id([matchId, userId])
+  @@unique([matchId, who])
+  @@index([userId])
+}
+
+model MatchDeck {
+  id              Int                     @id @default(autoincrement())
+  matchId         Int
+  match           TournamentMatch         @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId          Int
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sourceDeckId    Int?
+  sourceDeck      Deck?                   @relation(fields: [sourceDeckId], references: [id], onDelete: SetNull)
+  name            String
+  deckJson        Json
+  code            String
+  requiredVersion Int
+  characterKey    String
+  usable          Boolean                 @default(true)
+  disableReason   MatchDeckDisableReason?
+  frozenAt        DateTime?
+  gamePlayers     GamePlayer[]
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@unique([matchId, userId, characterKey])
+  @@unique([matchId, userId, sourceDeckId])
+  @@index([matchId, userId, usable])
+}
+
+model Game {
+  id              Int              @id @default(autoincrement())
+  matchId         Int?
+  match           TournamentMatch? @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  status          GameStatus       @default(PENDING)
+  coreVersion     String
+  gameVersion     String
+  stateLog        Json?
+  winnerWho       Int?
+  manualWinnerWho Int?
+  endReason       GameEndReason?
+  countForStats   Boolean          @default(true)
+  players         GamePlayer[]
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([matchId, status])
+  @@index([status, countForStats])
+}
+
+model GamePlayer {
+  gameId       Int
+  game         Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  who          Int
+  userId       Int?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  deckId       Int?
+  deck         Deck?      @relation(fields: [deckId], references: [id], onDelete: SetNull)
+  matchDeckId  Int?
+  matchDeck    MatchDeck? @relation(fields: [matchDeckId], references: [id], onDelete: SetNull)
+  deckName     String?
+  deckJson     Json?
+  characterKey String?
+
+  @@id([gameId, who])
+  @@index([userId])
+  @@index([deckId])
+  @@index([matchDeckId])
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  actorUserId Int
+  actor       User     @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  action      String
+  targetType  String
+  targetId    String
+  reason      String
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([targetType, targetId, createdAt])
 }
