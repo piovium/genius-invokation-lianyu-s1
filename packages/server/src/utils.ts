@@ -69,10 +69,12 @@ export class DeckVerificationError extends Error {
 const MATCH_CONFIG = (await fetch(
   "https://piovium.github.io/lianyu-s1-data-config/config.json",
 ).then((res) => res.json())) as {
+  version: string;
   overrides: OverrideData[];
   versions: Record<string, Version>;
   mods: string[];
 };
+export const MATCH_CONFIG_VERSION = MATCH_CONFIG.version;
 export const versionResolver = createOfficialVersionResolver(
   void 0,
   MATCH_CONFIG.versions,
