@@ -35,6 +35,8 @@ import { Login } from "../components/Login";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { Portal } from "solid-js/web";
+import { RegistrationBanner } from "../competition/RegistrationBanner";
+import { MyMatches } from "../competition/MyMatches";
 
 export default function Home() {
   const { t } = useI18n();
@@ -131,7 +133,8 @@ export default function Home() {
             <div class="text-red-500">
               <p>
                 {t("userInfoLoadFailed", {
-                  message: userError()?.message ?? String(userError()),
+                  message:
+                    (userError() as Error)?.message ?? String(userError()),
                 })}
               </p>
               <p>
@@ -153,6 +156,8 @@ export default function Home() {
                   })}
                 </h2>
               </div>
+              <RegistrationBanner />
+              <MyMatches />
               <div class="flex flex-grow flex-col-reverse md:flex-row gap-8 md:gap-0 min-h-0">
                 <div class="h-full w-full md:w-128 flex flex-col items-start md:bottom-opacity-gradient">
                   <div class="flex flex-row justify-between mb-4 w-full md:pr-6 items-end">
