@@ -2,16 +2,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  BadGatewayException,
   Body,
   Controller,
-  Delete,
   Get,
   NotFoundException,
   Param,
   ParseIntPipe,
   Patch,
   Post,
+  Res,
 } from "@nestjs/common";
+import type { FastifyReply } from "fastify";
 import { IsOptional, Length, Matches } from "class-validator";
 import { UsersService, type UserInfo } from "./users.service";
 import { User } from "../auth/user.decorator";
@@ -24,6 +26,7 @@ export class UpdateUserInfoDto {
   chessboardColor?: string | null;
 
   @Length(1, 64)
+  @Matches(/\S/)
   @IsOptional()
   name?: string;
 }
@@ -54,19 +57,38 @@ export class UsersController {
     return this.registration.apply(userId);
   }
 
-  @Delete("me/registration")
-  withdraw(@User() userId: number) {
-    return this.registration.withdraw(userId);
-  }
-
-  @Get("me/matches")
-  matches(@User() userId: number) {
-    return this.users.activeMatches(userId);
+  @Public()
+  @Get(":id/avatar")
+  async avatar(
+    @Param("id", ParseIntPipe) id: number,
+    @Res() reply: FastifyReply,
+  ) {
+    const user = await this.users.findAvatarQq(id);
+    if (!user) throw new NotFoundException();
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(user.qq)}&s=640`,
+        { signal: AbortSignal.timeout(5000) },
+      );
+    } catch {
+      throw new BadGatewayException("头像服务暂时不可用");
+    }
+    if (!response.ok) {
+      throw new BadGatewayException("头像服务暂时不可用");
+    }
+    reply
+      .header(
+        "Content-Type",
+        response.headers.get("content-type") ?? "image/jpeg",
+      )
+      .header("Cache-Control", "public, max-age=3600")
+      .send(Buffer.from(await response.arrayBuffer()));
   }
 
   @Get(":id")
-  async getUser(@Param("id", ParseIntPipe) id: number): Promise<UserInfo> {
-    const user = await this.users.findById(id);
+  async getUser(@Param("id", ParseIntPipe) id: number) {
+    const user = await this.users.findPublicById(id);
     if (!user) throw new NotFoundException();
     return user;
   }

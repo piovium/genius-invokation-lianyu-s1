@@ -23,6 +23,7 @@ import { AuthGuard } from "./auth.guard";
 import { DbModule } from "../db/db.module";
 import { QqGroupModule } from "../qq-group/qq-group.module";
 import { RegistrationModule } from "../registration/registration.module";
+import { AuthRateLimitService } from "./auth-rate-limit.service";
 
 @Module({
   imports: [
@@ -33,11 +34,12 @@ import { RegistrationModule } from "../registration/registration.module";
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: "42d" },
+      signOptions: { expiresIn: "12h" },
     }),
   ],
   providers: [
     AuthService,
+    AuthRateLimitService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard,

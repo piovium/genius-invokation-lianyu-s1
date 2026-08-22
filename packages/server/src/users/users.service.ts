@@ -34,7 +34,10 @@ export class UsersService {
       ? await this.prisma.user.count({
           where: {
             competitionStatus: { not: "NONE" },
-            appliedAt: { lte: user.appliedAt },
+            OR: [
+              { appliedAt: { lt: user.appliedAt } },
+              { appliedAt: user.appliedAt, id: { lte: user.id } },
+            ],
           },
         })
       : null;
@@ -58,32 +61,22 @@ export class UsersService {
     };
   }
 
+  async findPublicById(id: number) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, chessboardColor: true },
+    });
+  }
+
+  async findAvatarQq(id: number) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: { qq: true },
+    });
+  }
+
   async updateUserInfo(id: number, dto: UpdateUserInfoDto) {
     await this.prisma.user.update({ where: { id }, data: dto });
     return this.findById(id);
-  }
-
-  async activeMatches(userId: number) {
-    return this.prisma.tournamentMatch.findMany({
-      where: {
-        event: { phase: { in: ["DECK_COLLECTION", "RUNNING"] } },
-        participants: { some: { userId } },
-      },
-      include: {
-        event: true,
-        participants: {
-          include: {
-            user: { select: { id: true, name: true, qq: true } },
-          },
-          orderBy: { who: "asc" },
-        },
-        games: {
-          include: { players: true },
-          orderBy: { createdAt: "desc" },
-        },
-        matchDecks: { where: { userId } },
-      },
-      orderBy: { scheduledStart: "desc" },
-    });
   }
 }

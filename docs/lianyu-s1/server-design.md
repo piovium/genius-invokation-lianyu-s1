@@ -112,7 +112,7 @@ GameEndReason          NORMAL | ENGINE_ERROR | SURRENDER | ADMIN
 MatchDeckDisableReason DUEL_USED | CONQUEST_WINNER_USED | ADMIN
 ```
 
-数据库中只保存 `GameStatus.PENDING` 和 `FINISHED`。接口根据 `RoomsService` 的映射额外返回 `runtimeStatus: "WAITING" | "PLAYING" | null`。
+数据库中只保存 `GameStatus.PENDING` 和 `FINISHED`。接口根据 `RoomsService` 的映射额外返回 `runtimeStatus: "WAITING" | "PLAYING" | "FINALIZING" | null`。`FINALIZING` 从内存对局停止后持续到终局事务提交，期间保持选手运行态锁且禁止重复入房。
 
 ### 5.2 User 与认证
 

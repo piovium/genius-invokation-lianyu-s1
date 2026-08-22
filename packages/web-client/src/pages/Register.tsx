@@ -74,7 +74,8 @@ export default function Register() {
   };
 
   const finishRegistration = async (result: AuthResult) => {
-    const snapshot = guestDecks().map(({ name, characters, cards }) => ({
+    const snapshot = guestDecks().map(({ id, name, characters, cards }) => ({
+      clientImportKey: String(id),
       name,
       characters: [...characters],
       cards: [...cards],
@@ -110,6 +111,7 @@ export default function Register() {
       registrationCode: code(),
       name: name().trim(),
       apply: apply(),
+      acknowledged: acknowledged(),
     };
     try {
       if (method() === "password") {
