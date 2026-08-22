@@ -25,6 +25,7 @@ interface JoinDeck {
   requiredVersion: number;
   deckJson?: { characters: number[]; cards: number[] };
   usable?: boolean;
+  disableReason?: string | null;
 }
 interface JoinOptions {
   gameId: number;
@@ -44,12 +45,17 @@ export default function TournamentGame() {
   const [selected, setSelected] = createSignal<number | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal("");
-  const decks = (): DeckInfo[] =>
+  const decks = (): (DeckInfo & {
+    usable: boolean;
+    disableReason?: string | null;
+  })[] =>
     (options()?.decks ?? []).map((deck) => ({
       id: deck.sourceDeckId ?? deck.id,
       name: deck.name,
       code: deck.code,
       requiredVersion: deck.requiredVersion,
+      usable: deck.usable ?? true,
+      disableReason: deck.disableReason,
       ...(deck.deckJson ?? staticDecode(deck.code)),
     }));
 
@@ -118,20 +124,33 @@ export default function TournamentGame() {
                 <div class="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
                   <For each={decks()}>
                     {(deck) => (
-                      <button
-                        class="text-left rounded-xl p-1 b-2 data-[selected=true]:b-amber-5"
+                      <div
+                        role="button"
+                        tabindex="0"
                         data-selected={selected() === deck.id}
-                        onClick={() => setSelected(deck.id)}
+                        aria-disabled={!deck.usable}
+                        class="text-left rounded-xl p-1 b-2 data-[selected=true]:b-amber-5 data-[disabled=true]:opacity-55 data-[disabled=true]:cursor-not-allowed"
+                        data-disabled={!deck.usable}
+                        onClick={() => deck.usable && setSelected(deck.id)}
+                        onKeyDown={(event) =>
+                          deck.usable &&
+                          (event.key === "Enter" || event.key === " ") &&
+                          setSelected(deck.id)
+                        }
                       >
-                        <DeckBriefInfo {...deck} />
+                        <DeckBriefInfo {...deck} viewable={false} />
                         <span class="block text-center p-1 text-sm">
-                          {selected() === deck.id ? "已选择" : "选择"}
+                          {!deck.usable
+                            ? `已耗尽 · ${deck.disableReason ?? "不可用"}`
+                            : selected() === deck.id
+                              ? "已选择"
+                              : "选择"}
                         </span>
-                      </button>
+                      </div>
                     )}
                   </For>
                 </div>
-                <Show when={!decks().length}>
+                <Show when={!decks().some((deck) => deck.usable)}>
                   <div class="alert alert-border-warning mt-3">
                     没有可用牌组，系统不会自动判负。请联系管理员介入处理。
                   </div>

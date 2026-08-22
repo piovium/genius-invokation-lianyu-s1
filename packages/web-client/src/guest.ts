@@ -117,7 +117,12 @@ export const useGuestDecks = (): GuestDeck => {
       pinGuestDeck: async (id) => {
         await limit(updateGuestDeck, id, {});
       },
-      clearGuestDecks: () => setGuestDeck([]),
+      clearGuestDecks: () =>
+        setGuestDeck(
+          produce((decks) => {
+            decks.splice(0, decks.length);
+          }),
+        ),
     },
   ];
 };
