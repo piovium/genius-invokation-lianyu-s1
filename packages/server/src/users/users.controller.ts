@@ -1,31 +1,22 @@
-// Copyright (C) 2024-2025 Guyutongxue
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as
-// published by the Free Software Foundation, either version 3 of the
-// License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024-2026 Guyutongxue
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
   ParseIntPipe,
   Patch,
-  Body,
+  Post,
 } from "@nestjs/common";
+import { IsOptional, Length, Matches } from "class-validator";
 import { UsersService, type UserInfo } from "./users.service";
 import { User } from "../auth/user.decorator";
 import { Public } from "../auth/auth.guard";
-import { IsOptional, Length, Matches } from "class-validator";
+import { RegistrationService } from "../registration/registration.service";
 
 export class UpdateUserInfoDto {
   @Matches(/^#[0-9a-fA-F]{6}$/)
@@ -39,38 +30,44 @@ export class UpdateUserInfoDto {
 
 @Controller("users")
 export class UsersController {
-  constructor(private users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly registration: RegistrationService,
+  ) {}
 
   @Get("me")
   @Public()
   async me(@User() userId: number | null): Promise<UserInfo | null> {
-    if (userId === null) {
-      return null;
-    }
+    if (userId === null) return null;
     const user = await this.users.findById(userId);
-    if (!user) {
-      throw new NotFoundException();
-    }
+    if (!user) throw new NotFoundException();
     return user;
   }
 
   @Patch("me")
-  async updateMe(
-    @User() userId: number | null,
-    @Body() userInfo: UpdateUserInfoDto,
-  ) {
-    if (userId === null) {
-      throw new NotFoundException();
-    }
-    return await this.users.updateUserInfo(userId, userInfo);
+  updateMe(@User() userId: number, @Body() userInfo: UpdateUserInfoDto) {
+    return this.users.updateUserInfo(userId, userInfo);
+  }
+
+  @Post("me/registration")
+  register(@User() userId: number) {
+    return this.registration.apply(userId);
+  }
+
+  @Delete("me/registration")
+  withdraw(@User() userId: number) {
+    return this.registration.withdraw(userId);
+  }
+
+  @Get("me/matches")
+  matches(@User() userId: number) {
+    return this.users.activeMatches(userId);
   }
 
   @Get(":id")
   async getUser(@Param("id", ParseIntPipe) id: number): Promise<UserInfo> {
     const user = await this.users.findById(id);
-    if (!user) {
-      throw new NotFoundException();
-    }
+    if (!user) throw new NotFoundException();
     return user;
   }
 }

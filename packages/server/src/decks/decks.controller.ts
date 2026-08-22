@@ -26,6 +26,7 @@ import {
   Patch,
   Post,
   Query,
+  Put,
 } from "@nestjs/common";
 import { User } from "../auth/user.decorator";
 import {
@@ -36,11 +37,13 @@ import {
   Length,
   Max,
   Min,
+  ValidateNested,
 } from "class-validator";
 import { DecksService } from "./decks.service";
 import { PaginationDto, parseStringToInt } from "../utils";
 import { VERSIONS, type Version } from "@gi-tcg/core";
 import { Transform } from "class-transformer";
+import { Type } from "class-transformer";
 import type { Deck } from "@gi-tcg/typings";
 import { Public } from "../auth/auth.guard";
 
@@ -88,6 +91,14 @@ export class QueryDeckDto extends PaginationDto {
   requiredVersion?: number;
 }
 
+export class ImportDecksDto {
+  @ValidateNested({ each: true })
+  @Type(() => CreateDeckDto)
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  decks!: CreateDeckDto[];
+}
+
 @Controller("decks")
 export class DecksController {
   constructor(private decks: DecksService) {}
@@ -108,6 +119,28 @@ export class DecksController {
     return this.decks.deckToCode(deck);
   }
 
+  @Post("import")
+  importDecks(@User() userId: number, @Body() { decks }: ImportDecksDto) {
+    return this.decks.importDecks(userId, decks);
+  }
+
+  @Put(":deckId/competition")
+  selectCompetitionDeck(
+    @User() userId: number,
+    @Param("deckId", ParseIntPipe) deckId: number,
+  ) {
+    return this.decks.selectCompetitionDeck(userId, deckId);
+  }
+
+  @Delete(":deckId/competition")
+  async unselectCompetitionDeck(
+    @User() userId: number,
+    @Param("deckId", ParseIntPipe) deckId: number,
+  ) {
+    await this.decks.unselectCompetitionDeck(userId, deckId);
+    return { message: `deck ${deckId} removed from competition` };
+  }
+
   @Get()
   async getAllDecks(@User() userId: number, @Query() pagination: QueryDeckDto) {
     return await this.decks.getAllDecks(userId, pagination);
@@ -124,7 +157,6 @@ export class DecksController {
     }
     return deck;
   }
-
 
   @Patch(":deckId")
   async updateDeck(
