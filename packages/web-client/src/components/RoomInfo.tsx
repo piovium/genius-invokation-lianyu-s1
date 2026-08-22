@@ -34,6 +34,10 @@ export interface RoomInfoProps extends RoomInfo {
 export function RoomInfo(props: RoomInfoProps) {
   const { t } = useI18n();
   const { status } = useAuth();
+  const isAdmin = () => {
+    const current = status();
+    return current.type === "user" && current.role === "ADMIN";
+  };
   const insideRoom = () => props.players.some((p) => p.id === status()?.id);
   const code = () => roomIdToCode(props.id);
   const url = (playerId: string | number) => {
@@ -60,12 +64,20 @@ export function RoomInfo(props: RoomInfoProps) {
       <div class="flex flex-row items-center gap-2 mb-3">
         <h4 class="font-semibold">{t("room", { code: code() })}</h4>
         <Show when={!props.watchable}>
-          <span title={t("spectateUnavailable")}>&#8856;</span>
+          <span class="badge badge-soft-error" title={t("spectateUnavailable")}>
+            禁止观战
+          </span>
+        </Show>
+        <Show when={props.config?.private}>
+          <span class="badge badge-soft-warning">私密</span>
+        </Show>
+        <Show when={isAdmin() && (!props.watchable || props.config?.private)}>
+          <span class="badge badge-soft-primary">管理员可查看</span>
         </Show>
       </div>
       <div
         class="grid items-center group grid-cols-[calc(50%-1rem)_2rem_calc(50%-1rem)]"
-        data-disabled={!insideRoom() && !props.watchable}
+        data-disabled={!insideRoom() && !props.watchable && !isAdmin()}
       >
         <Show when={props.players.length > 0}>
           <A

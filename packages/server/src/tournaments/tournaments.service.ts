@@ -516,7 +516,7 @@ export class TournamentsService {
         match: true,
         players: {
           where: { userId },
-          include: { user: { select: { name: true } } },
+          include: { user: { select: { name: true, qq: true } } },
         },
       },
     });
@@ -532,6 +532,7 @@ export class TournamentsService {
       userId,
       who: player.who as 0 | 1,
       playerName: player.user.name,
+      avatarUrl: `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(player.user.qq)}&s=640`,
       deckId: player.deckId,
       deck: player.deckJson as unknown as {
         characters: number[];

@@ -24,8 +24,8 @@ export interface PlayerInfo {
   deck: Deck;
 }
 
-export function getGithubAvatarUrl(userId: number) {
-  return `https://avatars.githubusercontent.com/u/${userId}?v=4`;
+export function getQqAvatarUrl(qq: string) {
+  return `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(qq)}&s=640`;
 }
 
 function hashCode(s: string) {
@@ -52,13 +52,10 @@ export function getRandomAvatar(name: string): string {
 const AVATAR_REGEX = new RegExp(`^/avatars/(${AVATARS.join("|")})$`);
 function isValidAvatar(avatar: string | null | undefined): avatar is string {
   if (!avatar) return false;
-  return AVATAR_REGEX.test(avatar);
+  return AVATAR_REGEX.test(avatar) || /^https:\/\/q1\.qlogo\.cn\//.test(avatar);
 }
 
 export function getPlayerAvatarUrl(player: PlayerInfo): string {
-  if (!player.isGuest && typeof player.id === "number") {
-    return getGithubAvatarUrl(player.id);
-  }
   if (isValidAvatar(player.avatarUrl)) {
     return player.avatarUrl;
   }
