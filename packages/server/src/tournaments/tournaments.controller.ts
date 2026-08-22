@@ -42,6 +42,7 @@ import { AdminGuard } from "../auth/admin.guard";
 import { User } from "../auth/user.decorator";
 import { parseStringToInt } from "../utils";
 import { TournamentsService } from "./tournaments.service";
+import { RoomsService } from "../rooms/rooms.service";
 
 export class ReasonDto {
   @IsString()
@@ -208,7 +209,10 @@ class SelectDeckDto {
 @UseGuards(AdminGuard)
 @Controller("admin")
 export class AdminTournamentsController {
-  constructor(private readonly tournaments: TournamentsService) {}
+  constructor(
+    private readonly tournaments: TournamentsService,
+    private readonly rooms: RoomsService,
+  ) {}
 
   @Get("registration/settings")
   settings() {
@@ -263,12 +267,25 @@ export class AdminTournamentsController {
   }
 
   @Post("events/:id/advance")
-  advanceEvent(
+  async advanceEvent(
     @User() actor: number,
     @Param("id", ParseIntPipe) id: number,
     @Body() { reason }: ReasonDto,
   ) {
-    return this.tournaments.advanceEvent(actor, id, reason);
+    const event = await this.tournaments.event(id);
+    const pendingGameIds =
+      event?.matches.flatMap((match) =>
+        match.games
+          .filter((game) => game.status === "PENDING")
+          .map((game) => game.id),
+      ) ?? [];
+    const result = await this.tournaments.advanceEvent(actor, id, reason);
+    if (result.phase === "FINISHED") {
+      for (const gameId of pendingGameIds) {
+        this.rooms.terminateTournamentGame(gameId);
+      }
+    }
+    return result;
   }
 
   @Get("events/:id/export")
@@ -339,6 +356,7 @@ export class AdminTournamentsController {
     @Param("id", ParseIntPipe) id: number,
     @Body() dto: GameInterventionDto,
   ) {
+    this.rooms.terminateTournamentGame(id);
     return this.tournaments.interveneGame(actor, id, dto);
   }
 
@@ -353,7 +371,10 @@ export class AdminTournamentsController {
 
 @Controller("tournament-games")
 export class TournamentGamesController {
-  constructor(private readonly tournaments: TournamentsService) {}
+  constructor(
+    private readonly tournaments: TournamentsService,
+    private readonly rooms: RoomsService,
+  ) {}
 
   @Get(":id/join-options")
   options(@User() userId: number, @Param("id", ParseIntPipe) id: number) {
@@ -361,11 +382,21 @@ export class TournamentGamesController {
   }
 
   @Post(":id/join")
-  join(
+  async join(
     @User() userId: number,
     @Param("id", ParseIntPipe) id: number,
     @Body() { deckId }: SelectDeckDto,
   ) {
-    return this.tournaments.chooseDeck(id, userId, deckId);
+    await this.tournaments.chooseDeck(id, userId, deckId);
+    const roomData = await this.tournaments.tournamentRoomData(id, userId);
+    return this.rooms.joinTournamentGame({
+      ...roomData,
+      roomConfig: roomData.roomConfig,
+      finalize: (result) =>
+        this.tournaments.finalizeGame({
+          gameId: id,
+          ...result,
+        }),
+    });
   }
 }
