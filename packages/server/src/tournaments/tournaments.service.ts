@@ -287,7 +287,12 @@ export class TournamentsService {
       where: { id },
       include: {
         event: true,
-        participants: { include: { user: true }, orderBy: { who: "asc" } },
+        participants: {
+          include: {
+            user: { select: { id: true, qq: true, name: true } },
+          },
+          orderBy: { who: "asc" },
+        },
         matchDecks: true,
         games: { include: { players: true }, orderBy: { id: "asc" } },
       },
@@ -628,7 +633,14 @@ export class TournamentsService {
     if (winner) {
       await tx.tournamentMatch.update({
         where: { id: matchId },
-        data: { winnerUserId: winner },
+        data: { winnerUserId: winner, autoCreateGame: false },
+      });
+      return;
+    }
+    if (match.games.length >= match.maxGames) {
+      await tx.tournamentMatch.update({
+        where: { id: matchId },
+        data: { autoCreateGame: false },
       });
       return;
     }
