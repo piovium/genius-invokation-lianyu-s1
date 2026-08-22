@@ -35,6 +35,7 @@ import {
   IsInt,
   IsPositive,
   IsOptional,
+  IsString,
   Length,
   Max,
   Min,
@@ -65,6 +66,12 @@ export class DeckDto implements Deck {
 export class CreateDeckDto extends DeckDto {
   @Length(1, 64)
   name!: string;
+}
+
+export class ImportDeckDto extends CreateDeckDto {
+  @IsString()
+  @Length(1, 128)
+  clientImportKey!: string;
 }
 
 export class UpdateDeckDto {
@@ -98,10 +105,10 @@ export class QueryDeckDto extends PaginationDto {
 
 export class ImportDecksDto {
   @ValidateNested({ each: true })
-  @Type(() => CreateDeckDto)
+  @Type(() => ImportDeckDto)
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
-  decks!: CreateDeckDto[];
+  decks!: ImportDeckDto[];
 }
 
 @Controller("decks")

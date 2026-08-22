@@ -17,22 +17,29 @@ const modeLabel = {
 
 export function MyMatches() {
   const auth = useAuth();
-  const [matches, { refetch }] = createResource<TournamentMatch[]>(() =>
-    axios.get("users/me/matches").then((r) => r.data),
+  const user = () => {
+    const current = auth.status();
+    return current.type === "user" ? current : null;
+  };
+  const matchUserId = () =>
+    user()?.competitionStatus === "PLAYER" ? user()!.id : false;
+  const [matches, { refetch }] = createResource(matchUserId, () =>
+    axios
+      .get<TournamentMatch[]>("users/me/matches")
+      .then((response) => response.data),
   );
   let timer: number | undefined;
   onMount(
     () =>
       (timer = window.setInterval(
-        () => document.visibilityState === "visible" && refetch(),
+        () =>
+          document.visibilityState === "visible" &&
+          matchUserId() !== false &&
+          refetch(),
         5000,
       )),
   );
   onCleanup(() => timer && clearInterval(timer));
-  const user = () => {
-    const current = auth.status();
-    return current.type === "user" ? current : null;
-  };
   const me = () => user()?.id ?? null;
 
   return (
@@ -100,9 +107,13 @@ export function MyMatches() {
                             <span class="text-sm">
                               {game.status === "FINISHED"
                                 ? "已结束"
-                                : game.startedAt
+                                : game.runtimeStatus === "PLAYING"
                                   ? "进行中"
-                                  : "未开始"}
+                                  : game.runtimeStatus === "FINALIZING"
+                                    ? "结算中"
+                                    : game.runtimeStatus === "WAITING"
+                                      ? "等待对手"
+                                      : "未开始"}
                             </span>
                             <Show when={game.status === "FINISHED"}>
                               <span class="ml-2 text-sm">
@@ -116,12 +127,19 @@ export function MyMatches() {
                               </span>
                             </Show>
                           </div>
-                          <Show when={game.status === "PENDING"}>
+                          <Show
+                            when={
+                              game.status === "PENDING" &&
+                              game.runtimeStatus !== "FINALIZING"
+                            }
+                          >
                             <A
                               class="btn btn-outline-primary"
                               href={`/competition/games/${game.id}`}
                             >
-                              {game.startedAt ? "重连" : "进入"}
+                              {game.runtimeStatus === "PLAYING"
+                                ? "重连"
+                                : "进入"}
                             </A>
                           </Show>
                         </li>
