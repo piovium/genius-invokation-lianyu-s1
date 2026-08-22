@@ -38,8 +38,12 @@ import {
   IsUrl,
 } from "class-validator";
 import { RoomsService, type PlayerId } from "./rooms.service";
-import { Guest, User, UserOrGuest } from "../auth/user.decorator";
-import type { RpcMethod, RpcResponse, RpcResponsePayloadOf } from "@gi-tcg/typings";
+import { Guest, IsAdmin, User, UserOrGuest } from "../auth/user.decorator";
+import type {
+  RpcMethod,
+  RpcResponse,
+  RpcResponsePayloadOf,
+} from "@gi-tcg/typings";
 import { VERSIONS, type Version } from "@gi-tcg/core";
 import { DeckDto } from "../decks/decks.controller";
 import { Public } from "../auth/auth.guard";
@@ -152,8 +156,8 @@ export class RoomsController {
   ) {}
 
   @Get()
-  getRooms(@User() userId: number | null) {
-    return this.rooms.getAllRooms(userId === null);
+  getRooms(@User() userId: number | null, @IsAdmin() isAdmin: boolean) {
+    return this.rooms.getAllRooms(userId === null, isAdmin);
   }
 
   @Post()
@@ -184,10 +188,11 @@ export class RoomsController {
   @Get(":roomId")
   getRoom(
     @User() userId: number | null,
+    @IsAdmin() isAdmin: boolean,
     @Param("roomId", ParseIntPipe) roomId: number,
   ) {
     const room = this.rooms.getRoom(roomId);
-    if (userId === null && !room.config.allowGuest) {
+    if (!isAdmin && userId === null && !room.config.allowGuest) {
       throw new UnauthorizedException(`This room does not allow guests`);
     }
     return room;
@@ -196,12 +201,13 @@ export class RoomsController {
   @Get(":roomId/gameLog")
   getRoomGameLog(
     @UserOrGuest() playerId: number | string | null,
+    @IsAdmin() isAdmin: boolean,
     @Param("roomId", ParseIntPipe) roomId: number,
   ) {
     if (playerId === null) {
       throw new UnauthorizedException();
     }
-    return this.rooms.getRoomGameLog(playerId, roomId);
+    return this.rooms.getRoomGameLog(playerId, roomId, isAdmin);
   }
 
   @Delete(":roomId")
@@ -237,10 +243,16 @@ export class RoomsController {
   @Sse(":roomId/players/:targetPlayerId/notification")
   getNotification(
     @UserOrGuest() playerId: number | string | null,
+    @IsAdmin() isAdmin: boolean,
     @Param("roomId", ParseIntPipe) roomId: number,
     @Param("targetPlayerId", ParsePlayerIdPipe) targetPlayerId: string | number,
   ) {
-    return this.rooms.playerNotification(roomId, playerId, targetPlayerId);
+    return this.rooms.playerNotification(
+      roomId,
+      playerId,
+      targetPlayerId,
+      isAdmin,
+    );
   }
 
   @Post(":roomId/players/:targetPlayerId/actionResponse")
