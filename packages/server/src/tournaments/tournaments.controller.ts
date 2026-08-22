@@ -227,11 +227,15 @@ export class AdminTournamentsController {
   }
 
   @Get("users")
-  users(
+  async users(
     @Query("status") status?: CompetitionStatus,
     @Query("descending") descending?: string,
   ) {
-    return this.tournaments.users(status, descending === "true");
+    const users = await this.tournaments.users(status, descending === "true");
+    return users.map((user) => ({
+      ...user,
+      inRunningGame: this.rooms.currentRoom(user.id) !== null,
+    }));
   }
 
   @Get("users/:id/decks")

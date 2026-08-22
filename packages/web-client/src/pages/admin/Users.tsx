@@ -183,7 +183,7 @@ export default function AdminUsers() {
               <th>角色</th>
               <th>报名状态</th>
               <th>报名时间</th>
-              <th>活跃盘次</th>
+              <th>活跃盘次 / 内存对局</th>
               <th>注册时间</th>
             </tr>
           </thead>
@@ -212,7 +212,12 @@ export default function AdminUsers() {
                   <td>{user.role}</td>
                   <td>{statusText[user.competitionStatus]}</td>
                   <td>{fmt(user.appliedAt)}</td>
-                  <td>{user.activeMatchId ? `#${user.activeMatchId}` : "—"}</td>
+                  <td>
+                    {user.activeMatchId ? `#${user.activeMatchId}` : "—"}
+                    <Show when={user.inRunningGame}>
+                      <span class="badge badge-soft-error ml-2">运行中</span>
+                    </Show>
+                  </td>
                   <td>{fmt(user.createdAt)}</td>
                 </tr>
               )}

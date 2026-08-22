@@ -103,6 +103,7 @@ export interface AdminUser {
   appliedAt: string | null;
   activeMatchId: number | null;
   createdAt: string;
+  inRunningGame?: boolean;
 }
 
 export interface Ranking {
