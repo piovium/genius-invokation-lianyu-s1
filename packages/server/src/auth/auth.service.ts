@@ -3,7 +3,6 @@
 
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { createId } from "@paralleldrive/cuid2";
 import { hash, verify } from "@node-rs/argon2";
 import {
@@ -22,57 +21,12 @@ import { PrismaService } from "../db/prisma.service";
 import { QqGroupService } from "../qq-group/qq-group.service";
 import { RegistrationService } from "../registration/registration.service";
 import { BusinessException } from "../errors";
+import { verifyRegistrationCode } from "./registration-code";
 
 const CHALLENGE_TTL_MS = 5 * 60_000;
-const REGISTRATION_CODE_TTL_SECONDS = Number(
-  process.env.REGISTRATION_CODE_TTL_SECONDS ?? "1800",
-);
-
 interface PendingRegistration {
   name: string;
   apply: boolean;
-}
-
-export function verifyRegistrationCode(
-  qq: string,
-  token: string,
-  secret = process.env.REGISTRATION_CODE_SECRET,
-  nowSeconds = Math.floor(Date.now() / 1000),
-) {
-  if (!secret) {
-    if (process.env.NODE_ENV !== "production" && token === "dev") return;
-    throw new BusinessException(
-      "REGISTRATION_CODE_INVALID",
-      "注册码服务尚未配置",
-      503,
-    );
-  }
-  const [timestampText, provided] = token.split(".");
-  const timestamp = Number(timestampText);
-  if (!provided || !Number.isSafeInteger(timestamp)) {
-    throw new BusinessException("REGISTRATION_CODE_INVALID", "注册码无效", 401);
-  }
-  if (
-    timestamp > nowSeconds + 60 ||
-    nowSeconds - timestamp > REGISTRATION_CODE_TTL_SECONDS
-  ) {
-    throw new BusinessException(
-      "REGISTRATION_CODE_EXPIRED",
-      "注册码已过期",
-      401,
-    );
-  }
-  const expected = createHmac("sha256", secret)
-    .update(`${qq}.${timestamp}`)
-    .digest("hex");
-  const expectedBytes = Buffer.from(expected, "utf8");
-  const providedBytes = Buffer.from(provided.toLowerCase(), "utf8");
-  if (
-    expectedBytes.length !== providedBytes.length ||
-    !timingSafeEqual(expectedBytes, providedBytes)
-  ) {
-    throw new BusinessException("REGISTRATION_CODE_INVALID", "注册码无效", 401);
-  }
 }
 
 @Injectable()
@@ -323,10 +277,14 @@ export class AuthService {
       ) {
         throw new UnauthorizedException("Passkey challenge 无效或已过期");
       }
-      return tx.authChallenge.update({
-        where: { id },
+      const consumed = await tx.authChallenge.updateMany({
+        where: { id, usedAt: null, expiresAt: { gt: new Date() } },
         data: { usedAt: new Date() },
       });
+      if (consumed.count !== 1) {
+        throw new UnauthorizedException("Passkey challenge 已被使用");
+      }
+      return challenge;
     });
   }
 

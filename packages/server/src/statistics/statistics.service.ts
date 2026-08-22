@@ -166,7 +166,7 @@ export class StatisticsService {
     const matches = await this.prisma.tournamentMatch.findMany({
       where: { eventId: { in: eventIds } },
       include: {
-        participants: { where: { status: "ACTIVE" } },
+        participants: true,
         games: { where: { status: "FINISHED" }, select: { id: true } },
       },
     });

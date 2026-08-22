@@ -9,9 +9,10 @@ import {
   TournamentGamesController,
 } from "./tournaments.controller";
 import { TournamentsService } from "./tournaments.service";
+import { RoomsModule } from "../rooms/rooms.module";
 
 @Module({
-  imports: [DbModule],
+  imports: [DbModule, RoomsModule],
   providers: [TournamentsService, AdminGuard],
   controllers: [AdminTournamentsController, TournamentGamesController],
   exports: [TournamentsService],

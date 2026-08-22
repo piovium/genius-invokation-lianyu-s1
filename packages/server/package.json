@@ -9,6 +9,7 @@
     "build": "pnpm prisma:generate && gnx scripts/build.ts",
     "start": "gnx dist/main.js",
     "check": "tsc --noEmit",
+    "test": "vitest run src/auth/registration-code.test.ts",
     "debug": "nest start --debug --watch"
   },
   "imports": {

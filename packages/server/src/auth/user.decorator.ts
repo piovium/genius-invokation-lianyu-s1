@@ -72,3 +72,12 @@ export const UserOrGuest = createParamDecorator(
     return request.auth.sub;
   },
 );
+
+export const IsAdmin = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest<{
+      auth?: { role?: unknown };
+    }>();
+    return request.auth?.role === "ADMIN";
+  },
+);
