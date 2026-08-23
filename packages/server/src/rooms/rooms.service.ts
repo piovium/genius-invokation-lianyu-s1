@@ -1498,6 +1498,11 @@ export class RoomsService {
     return getTournamentRuntimeStatus(gameId);
   }
 
+  tournamentRoomId(gameId: number) {
+    const roomId = this.tournamentRooms.get(gameId);
+    return roomId !== undefined && this.rooms.has(roomId) ? roomId : null;
+  }
+
   getRoom(roomId: number): RoomInfo {
     const room = this.rooms.get(roomId);
     if (!room) {
