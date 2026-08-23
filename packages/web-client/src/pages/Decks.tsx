@@ -30,6 +30,7 @@ export interface DeckInfo extends Deck {
   name: string;
   code: string;
   requiredVersion: number;
+  characterNames?: string[];
   competition?: MatchDeck | null;
 }
 

@@ -394,6 +394,22 @@ export class AdminTournamentsController {
     );
   }
 
+  @Delete("matches/:id/participants/:userId/decks")
+  unassignDeck(
+    @User() actor: number,
+    @Param("id", ParseIntPipe) id: number,
+    @Param("userId", ParseIntPipe) userId: number,
+    @Body() dto: AssignDeckDto,
+  ) {
+    return this.tournaments.unassignDeck(
+      actor,
+      id,
+      userId,
+      dto.deckId,
+      dto.reason,
+    );
+  }
+
   @Patch("games/:id/intervention")
   async gameIntervention(
     @User() actor: number,
