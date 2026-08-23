@@ -58,6 +58,7 @@ async function localDev() {
 async function remoteDev() {
   await $({
     env: { DATABASE_URL: process.env.DATABASE_URL! },
+    stdio: "inherit",
   })`pnpm prisma migrate dev`;
   await $({
     stdio: "inherit",
