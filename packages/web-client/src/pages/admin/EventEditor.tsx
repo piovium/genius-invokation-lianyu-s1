@@ -223,7 +223,10 @@ export default function EventEditor() {
   );
 
   return (
-    <AdminPage title="创建场次">
+    <AdminPage
+      title="创建场次"
+      breadcrumbs={[{ title: "比赛场次", href: "/admin/events" }]}
+    >
       <form class="flex flex-col gap-5" onSubmit={submit}>
         <section class="rounded-xl b b-gray-2 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label class="flex flex-col gap-1 sm:col-span-2">

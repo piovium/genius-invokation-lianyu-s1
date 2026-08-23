@@ -1,12 +1,13 @@
 import { A, useNavigate } from "@solidjs/router";
 import type { JSX, ParentProps } from "solid-js";
-import { Show, createEffect } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import { Layout } from "../../layouts/Layout";
 import { useAuth } from "../../auth";
 
 export function AdminPage(
   props: ParentProps<{
     title: JSX.Element;
+    breadcrumbs?: { title: JSX.Element; href: string }[];
     titleActions?: JSX.Element;
     actions?: JSX.Element;
   }>,
@@ -28,14 +29,37 @@ export function AdminPage(
       <Show when={admin()}>
         <div class="container mx-auto h-full flex flex-col min-h-0">
           <div class="flex flex-wrap gap-3 justify-between items-center mb-4">
-            <div>
-              <A class="text-sm text-blue-6 hover:underline" href="/admin">
-                赛事管理
-              </A>
-              <div class="flex flex-wrap items-center gap-2">
-                <h2 class="text-2xl font-bold">{props.title}</h2>
-                {props.titleActions}
-              </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="text-2xl font-bold">
+                <Show
+                  when={props.title !== "赛事管理"}
+                  fallback="赛事管理"
+                >
+                  <A class="text-blue-6 hover:underline" href="/admin">
+                    赛事管理
+                  </A>
+                  <For each={props.breadcrumbs}>
+                    {(breadcrumb) => (
+                      <>
+                        <span class="mx-1 text-gray-4" aria-hidden="true">
+                          /
+                        </span>
+                        <A
+                          class="text-blue-6 hover:underline"
+                          href={breadcrumb.href}
+                        >
+                          {breadcrumb.title}
+                        </A>
+                      </>
+                    )}
+                  </For>
+                  <span class="mx-1 text-gray-4" aria-hidden="true">
+                    /
+                  </span>
+                  <span aria-current="page">{props.title}</span>
+                </Show>
+              </h2>
+              {props.titleActions}
             </div>
             {props.actions}
           </div>
