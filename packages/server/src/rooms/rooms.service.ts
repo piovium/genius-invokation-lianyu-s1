@@ -77,6 +77,7 @@ import { DecksService } from "../decks/decks.service";
 import { UsersService } from "../users/users.service";
 import { GamesService } from "../games/games.service";
 import { inspect } from "node:util";
+import { randomUUID } from "node:crypto";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import semver from "semver";
 import { redis } from "../redis";
@@ -85,6 +86,7 @@ import {
   clearTournamentRuntimeStatus,
   getTournamentRuntimeStatus,
   markPlayersPlaying,
+  persistedRoundCount,
   setTournamentRuntimeStatus,
 } from "./room-runtime";
 
@@ -654,7 +656,10 @@ class Room {
     this.suppressTournamentFinalize = suppressTournamentFinalize;
     if (this.status === RoomStatus.Playing) this.game?.giveUp(0);
     this.stop();
-    return this.getStateLog();
+    return {
+      stateLog: this.getStateLog(),
+      roundCount: this.getRoundCount(),
+    };
   }
 
   onStop(cb: GameStopHandler) {
@@ -684,6 +689,10 @@ class Room {
 
   getStartedAt() {
     return this.startedAt;
+  }
+
+  getRoundCount() {
+    return this.game ? persistedRoundCount(this.game.state) : null;
   }
 
   getRoomInfo(): RoomInfo {
@@ -1132,7 +1141,8 @@ export class RoomsService {
       throw new UnauthorizedException("Tournament seat mismatch");
     }
     // Add to game database when room stopped
-    if (persistCasual)
+    if (persistCasual) {
+      const persistenceKey = `casual:${randomUUID()}`;
       room.onStop((room, game) => {
         if (!game) {
           return;
@@ -1159,12 +1169,14 @@ export class RoomsService {
           });
         }
         const winnerWho = game.state.winner;
-        this.games
-          .addGame({
+        const persistence = this.persistCasualGame(room.id, () =>
+          this.games.addGame({
+            persistenceKey,
             coreVersion: Room.CORE_VERSION,
             gameVersion: room.config.gameVersion,
             stateLog,
             winnerWho,
+            roundCount: room.getRoundCount(),
             endReason: room.getEndReason(),
             startedAt: room.getStartedAt(),
             players: players.map(({ playerInfo }) => ({
@@ -1173,11 +1185,11 @@ export class RoomsService {
               name: playerInfo.name,
               deck: playerInfo.deck,
             })),
-          })
-          .catch((error) => {
-            this.logger.error(`Failed to persist room ${room.id}: ${error}`);
-          });
+          }),
+        );
+        room.setTournamentFinalizePromise(persistence);
       });
+    }
     if (!beforeStart) {
       markPlayersPlaying(
         room.getPlayers().map((player) => player.playerInfo.id),
@@ -1222,6 +1234,7 @@ export class RoomsService {
     markStarted: () => Promise<unknown>;
     finalize: (result: {
       winnerWho: number | null;
+      roundCount: number | null;
       endReason: "NORMAL" | "ENGINE_ERROR" | "SURRENDER";
       stateLog: unknown;
     }) => Promise<unknown>;
@@ -1294,10 +1307,14 @@ export class RoomsService {
           const playerIds = finishedRoom
             .getPlayers()
             .map((player) => player.playerInfo.id);
-          if (!game || !finishedRoom.shouldFinalizeTournament()) {
+          if (!game) {
             clearPlayingPlayers(playerIds);
             this.tournamentRooms.delete(input.gameId);
             clearTournamentRuntimeStatus(input.gameId);
+            return;
+          }
+          if (!finishedRoom.shouldFinalizeTournament()) {
+            setTournamentRuntimeStatus(input.gameId, "FINALIZING");
             return;
           }
           setTournamentRuntimeStatus(input.gameId, "FINALIZING");
@@ -1307,6 +1324,7 @@ export class RoomsService {
             () =>
               input.finalize({
                 winnerWho: game.state.winner,
+                roundCount: finishedRoom.getRoundCount(),
                 endReason: finishedRoom.getEndReason(),
                 stateLog: finishedRoom.getStateLog(),
               }),
@@ -1342,12 +1360,53 @@ export class RoomsService {
     }
   }
 
+  private async persistCasualGame(
+    roomId: number,
+    persistGame: () => Promise<unknown>,
+  ) {
+    let attempt = 0;
+    for (;;) {
+      try {
+        await persistGame();
+        return;
+      } catch (error) {
+        attempt += 1;
+        const retryDelay = Math.min(30_000, 1000 * 2 ** (attempt - 1));
+        this.logger.error(
+          `Failed to persist room ${roomId} (attempt ${attempt}); retrying in ${retryDelay} ms: ${error}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+
   terminateTournamentGame(gameId: number, suppressFinalize = false) {
     const roomId = this.tournamentRooms.get(gameId);
     if (roomId === undefined) return null;
     const room = this.rooms.get(roomId);
     if (!room) return null;
     return room.adminTerminate(suppressFinalize);
+  }
+
+  async finalizeAdminTournamentGame(
+    gameId: number,
+    finalizeGame: (snapshot: {
+      stateLog: ReturnType<Room["getStateLog"]>;
+      roundCount: number | null;
+    }) => Promise<unknown>,
+  ) {
+    const roomId = this.tournamentRooms.get(gameId);
+    if (roomId === undefined) return null;
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+    const playerIds = room.getPlayers().map((player) => player.playerInfo.id);
+    const snapshot = room.adminTerminate(true);
+    const persistence = this.finalizeTournamentGame(gameId, playerIds, () =>
+      finalizeGame(snapshot),
+    );
+    room.setTournamentFinalizePromise(persistence);
+    await persistence;
+    return snapshot;
   }
 
   terminateWaitingTournamentRoomsForUser(userId: number) {

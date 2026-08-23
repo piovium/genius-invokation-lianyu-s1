@@ -20,6 +20,7 @@ import { Prisma, type User } from "#prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { QqGroupService } from "../qq-group/qq-group.service";
 import { RegistrationService } from "../registration/registration.service";
+import { assertRegistrationOpen } from "../registration/registration-window";
 import { BusinessException } from "../errors";
 import { verifyRegistrationCode } from "./registration-code";
 
@@ -72,9 +73,7 @@ export class AuthService {
       create: { id: 1 },
       update: {},
     });
-    if (settings.cutoffAt && settings.cutoffAt.getTime() <= Date.now()) {
-      throw new BusinessException("REGISTRATION_CLOSED", "报名已经截止", 409);
-    }
+    assertRegistrationOpen(settings);
     return {
       competitionStatus: "REGISTERED" as const,
       appliedAt: new Date(),
@@ -114,8 +113,8 @@ export class AuthService {
     if (await this.prisma.user.findUnique({ where: { qq: member.qq } })) {
       throw new BusinessException("QQ_ALREADY_REGISTERED", "该 QQ 已注册", 409);
     }
-    if (input.apply && !(await this.registration.settings()).isOpen) {
-      throw new BusinessException("REGISTRATION_CLOSED", "报名已经截止", 409);
+    if (input.apply) {
+      assertRegistrationOpen(await this.registration.settings());
     }
     const passwordHash = await hash(input.password, {
       algorithm: 2,
@@ -165,8 +164,8 @@ export class AuthService {
     if (await this.prisma.user.findUnique({ where: { qq: member.qq } })) {
       throw new BusinessException("QQ_ALREADY_REGISTERED", "该 QQ 已注册", 409);
     }
-    if (input.apply && !(await this.registration.settings()).isOpen) {
-      throw new BusinessException("REGISTRATION_CLOSED", "报名已经截止", 409);
+    if (input.apply) {
+      assertRegistrationOpen(await this.registration.settings());
     }
     const options = await generateRegistrationOptions({
       rpName: this.rpName,
