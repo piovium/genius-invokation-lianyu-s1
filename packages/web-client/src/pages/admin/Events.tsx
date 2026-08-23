@@ -13,7 +13,7 @@ export default function AdminEvents() {
       title="比赛场次"
       actions={
         <A class="btn btn-solid-primary" href="/admin/events/new">
-          <i class="i-mdi-plus" /> 批量创建场次
+          <i class="i-mdi-plus" /> 创建场次
         </A>
       }
     >

@@ -221,7 +221,7 @@ export default function EventEditor() {
   );
 
   return (
-    <AdminPage title="批量创建场次">
+    <AdminPage title="创建场次">
       <form class="flex flex-col gap-5" onSubmit={submit}>
         <section class="rounded-xl b b-gray-2 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label class="flex flex-col gap-1 sm:col-span-2">
@@ -502,7 +502,7 @@ export default function EventEditor() {
           </div>
         </section>
         <label class="flex flex-col gap-1">
-          <span>创建原因（审计）</span>
+          <span>创建原因</span>
           <textarea
             name="reason"
             class="textarea textarea-solid"
