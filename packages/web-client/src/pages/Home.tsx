@@ -123,7 +123,7 @@ export default function Home() {
   };
 
   return (
-    <Layout>
+    <Layout pageScroll>
       <div class="container mx-auto h-full px-2">
         <Switch>
           <Match when={userLoading()}>
