@@ -305,7 +305,7 @@ export default function Home() {
             </div>
           </Match>
           <Match when={true}>
-            <div class="w-full flex justify-center">
+            <div class="h-full flex items-center justify-center pb-12">
               <Login />
             </div>
           </Match>
