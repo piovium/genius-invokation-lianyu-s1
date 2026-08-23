@@ -36,14 +36,10 @@ export default function AdminEvent() {
       )
     )
       return;
-    const reason = prompt("请输入操作原因");
-    if (!reason?.trim()) return;
     setBusy(true);
     setMessage("");
     try {
-      await axios.post(`admin/events/${params.id}/advance`, {
-        reason: reason.trim(),
-      });
+      await axios.post(`admin/events/${params.id}/advance`, {});
       setMessage(`场次已步进至${next}。`);
       refetch();
     } catch (e) {
@@ -61,13 +57,10 @@ export default function AdminEvent() {
       current.phase === "DECK_COLLECTION"
         ? Number(prompt("牌组上限（0 不限）", String(current.deckLimit)))
         : undefined;
-    const reason = prompt("修改原因");
-    if (!reason?.trim()) return;
     try {
       await axios.patch(`admin/events/${current.id}`, {
         name: name.trim(),
         deckLimit,
-        reason: reason.trim(),
       });
       refetch();
     } catch (e) {
