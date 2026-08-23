@@ -165,8 +165,6 @@ export default function Home() {
                   })}
                 </h2>
               </div>
-              <RegistrationBanner />
-              <MyMatches />
               <div class="flex flex-grow flex-col-reverse md:flex-row gap-8 md:gap-0 min-h-0">
                 <div class="h-full w-full md:w-128 flex flex-col items-start md:bottom-opacity-gradient">
                   <div class="flex flex-row justify-between mb-4 w-full md:pr-6 items-end">
@@ -215,6 +213,8 @@ export default function Home() {
                 </div>
                 <div class="b-r-gray-200 b-1 hidden md:block mr-8" />
                 <div class="flex-grow flex flex-col md:min-w-128">
+                  <RegistrationBanner />
+                  <MyMatches />
                   <h4 class="text-xl font-bold mb-5">{t("startGame")}</h4>
                   <Show
                     when={!currentRoom()}

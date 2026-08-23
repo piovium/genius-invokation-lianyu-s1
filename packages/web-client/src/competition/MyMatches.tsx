@@ -136,17 +136,18 @@ export function MyMatches() {
                     ? null
                     : (game.players.find((player) => player.who === who)
                         ?.userId ?? null);
-                const winnerName = (
-                  game: TournamentGame,
-                  who: number | null,
-                ) => {
-                  if (who === null) return "无";
-                  const userId = winnerUserId(game, who);
-                  return (
-                    match.participants.find(
-                      (participant) => participant.userId === userId,
-                    )?.user.name ?? "未知选手"
+                const resultText = (game: TournamentGame) => {
+                  const adjudicated = game.manualWinnerWho !== null;
+                  const userId = winnerUserId(
+                    game,
+                    adjudicated ? game.manualWinnerWho : game.winnerWho,
                   );
+                  if (userId === null) {
+                    return adjudicated ? "裁定结果未知" : "对局结果未知";
+                  }
+                  return `${adjudicated ? "裁定" : "对局"}${
+                    userId === me() ? "胜利" : "失败"
+                  }`;
                 };
                 const resultColor = (game: TournamentGame) => {
                   const userId = winnerUserId(
@@ -157,36 +158,60 @@ export function MyMatches() {
                   return userId === me() ? "text-green-7" : "text-red-7";
                 };
                 return (
-                  <article class="rounded-xl b b-amber-3 p-4 bg-white">
-                    <div class="flex flex-wrap gap-2 justify-between">
-                      <h4 class="font-bold">
+                  <article class="rounded-xl b b-purple-5 bg-purple-1/50 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                      <h4 class="min-w-0 font-bold">
                         {match.event?.name ?? `场次 #${match.eventId}`}
                       </h4>
+                      <span class="text-right text-sm text-gray-5">
+                        {match.scheduledStart
+                          ? new Date(match.scheduledStart).toLocaleString()
+                          : "未指定"}{" "}
+                        —{" "}
+                        {match.scheduledEnd
+                          ? new Date(match.scheduledEnd).toLocaleString()
+                          : "未指定"}
+                      </span>
+                    </div>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
                       <span class="badge badge-soft-warning">
                         {phaseLabel[match.event?.phase ?? "RUNNING"]}
                       </span>
+                      <span class="badge badge-soft-primary">
+                        {modeLabel[match.mode]}
+                      </span>
+                      <span class="badge badge-soft-success">
+                        {match.maxGames} 局 {match.winsRequired} 胜
+                      </span>
                     </div>
-                    <p class="mt-2">
-                      对手：{opponent()?.user.name ?? "轮空"} ·{" "}
-                      {modeLabel[match.mode]}
-                    </p>
-                    <p class="text-sm text-gray-5">
-                      {match.scheduledStart
-                        ? new Date(match.scheduledStart).toLocaleString()
-                        : "未指定开始时间"}{" "}
-                      —{" "}
-                      {match.scheduledEnd
-                        ? new Date(match.scheduledEnd).toLocaleString()
-                        : "未指定结束时间"}
-                    </p>
-                    <p class="text-sm mt-1">
-                      比分 {wins(me())} : {wins(opponent()?.userId ?? null)} ·{" "}
-                      {match.maxGames} 局 {match.winsRequired} 胜
-                    </p>
-                    <ul class="mt-3 flex flex-col gap-2">
+                    <div class="mt-2 flex items-center justify-between gap-3">
+                      <div class="min-w-0 flex flex-col items-start">
+                        <span class="min-w-0 text-xs text-gray-5">对手</span>
+                        <button
+                          type="button"
+                          class="bg-transparent p-0 font-medium hover:text-blue-6 hover:underline disabled:text-inherit disabled:no-underline"
+                          disabled={!opponent()?.user.qq}
+                          title={opponent()?.user.qq}
+                          onClick={() =>
+                            void navigator.clipboard.writeText(
+                              opponent()?.user.qq ?? "",
+                            )
+                          }
+                        >
+                          {opponent()?.user.name ?? "轮空"}
+                        </button>
+                      </div>
+                      <div class="min-w-0 flex flex-col items-end">
+                        <span class="min-w-0 text-xs text-gray-5">比分</span>
+                        <span class="shrink-0 font-bold tabular-nums">
+                          {wins(me())} : {wins(opponent()?.userId ?? null)}
+                        </span>
+                      </div>
+                    </div>
+                    <ul class="flex flex-col">
                       <For each={match.games}>
                         {(game, index) => (
-                          <li class="flex items-center justify-between">
+                          <li class="flex items-center justify-between b-t-1 b-purple-3 mt-1 pt-1">
                             <div>
                               <span class="font-bold">第 {index() + 1} 局</span>{" "}
                               <span class="text-sm">
@@ -200,18 +225,14 @@ export function MyMatches() {
                                         ? "等待对手"
                                         : "未开始"}
                               </span>
-                              <Show when={game.status === "FINISHED"}>
-                                <span
-                                  class={`ml-2 text-sm font-bold ${resultColor(game)}`}
-                                >
-                                  原始赢家：
-                                  {winnerName(game, game.winnerWho)}
-                                  {game.manualWinnerWho !== null
-                                    ? ` · 裁定赢家：${winnerName(game, game.manualWinnerWho)}`
-                                    : ""}
-                                </span>
-                              </Show>
                             </div>
+                            <Show when={game.status === "FINISHED"}>
+                              <span
+                                class={`ml-2 text-sm font-bold ${resultColor(game)}`}
+                              >
+                                {resultText(game)}
+                              </span>
+                            </Show>
                             <Show
                               when={
                                 game.status === "PENDING" &&
@@ -221,14 +242,14 @@ export function MyMatches() {
                               {game.runtimeStatus === "PLAYING" &&
                               typeof game.roomId === "number" ? (
                                 <A
-                                  class="btn btn-outline-primary"
+                                  class="btn btn-solid-purple/50 h-6 py-0"
                                   href={`/rooms/${roomIdToCode(game.roomId)}?player=${user()!.id}&action=1`}
                                 >
                                   继续对局
                                 </A>
                               ) : (
                                 <button
-                                  class="btn btn-outline-primary"
+                                  class="btn btn-solid-purple/50 h-6 py-0"
                                   disabled={joiningGameId() === game.id}
                                   onClick={() => enterGame(game.id)}
                                 >
