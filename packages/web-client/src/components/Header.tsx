@@ -45,11 +45,11 @@ export function Header() {
       </div>
       <Show when={status().type === "user"}>
         <nav class="hidden md:flex gap-3 text-sm items-center">
-          <A class="btn btn-ghost-primary" href="/decks">
+          <A class="btn btn-outline-blue" href="/decks">
             我的牌组
           </A>
           <Show when={user()?.role === "ADMIN"}>
-            <A class="btn btn-solid-green" href="/admin">
+            <A class="btn btn-outline-purple" href="/admin">
               赛事管理
             </A>
           </Show>

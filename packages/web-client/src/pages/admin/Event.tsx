@@ -11,7 +11,6 @@ import {
 import type { TournamentEvent } from "../../api/models";
 import { errorMessage } from "../../api/errors";
 import { AdminPage, fmt, modeLabel, phaseLabel } from "./shared";
-import { M } from "../../../../core/dist/index-BMbzMSPC";
 
 export default function AdminEvent() {
   const params = useParams();
@@ -122,6 +121,7 @@ export default function AdminEvent() {
   return (
     <AdminPage
       title={event()?.name ?? "场次详情"}
+      breadcrumbs={[{ title: "比赛场次", href: "/admin/events" }]}
       titleActions={
         <button
           class="btn btn-ghost-primary text-sm"
