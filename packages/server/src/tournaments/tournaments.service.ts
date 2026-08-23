@@ -32,16 +32,16 @@ export class TournamentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async lock(tx: Tx, matchId: number) {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(22002, ${matchId})`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(22002, ${matchId})`;
   }
 
   private async lockEvent(tx: Tx, eventId: number) {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(22003, ${eventId})`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(22003, ${eventId})`;
   }
 
   private async lockUsers(tx: Tx, userIds: readonly number[]) {
     for (const userId of [...userIds].sort((a, b) => a - b)) {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(22001, ${userId})`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(22001, ${userId})`;
     }
   }
 
@@ -1061,7 +1061,7 @@ export class TournamentsService {
       throw new Error("Actor is required to update registration settings");
     }
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(22004, 1)`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(22004, 1)`;
       const before = await tx.registrationSetting.upsert({
         where: { id: 1 },
         create: { id: 1 },

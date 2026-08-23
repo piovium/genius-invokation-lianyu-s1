@@ -42,7 +42,7 @@ export function RegistrationBanner() {
   const registrationMessage = () => {
     const current = settings();
     if (!current || current.isOpen !== false) {
-      return "报名开放中，无需填写额外资料。";
+      return "报名开放中！";
     }
     if (current.state === "NOT_STARTED" && current.opensAt) {
       return `报名将于 ${new Date(current.opensAt).toLocaleString()} 开始`;
@@ -64,8 +64,8 @@ export function RegistrationBanner() {
       }>("users/me/registration");
       setMessage(
         data.waitlisted
-          ? `当前报名人数已满（第 ${data.position} 位），您已进入候补但不保证参赛。`
-          : `报名成功，当前顺位 ${data.position}。`,
+          ? `当前报名人数已满，您已进入候补但不保证参赛。`
+          : `报名成功！`,
       );
       await auth.refresh();
     } catch (reason) {
@@ -110,14 +110,10 @@ export function RegistrationBanner() {
             </Show>
             <Show when={current().competitionStatus === "REGISTERED"}>
               <p>
-                已报名
-                {current().queuePosition
-                  ? ` · 顺位 ${current().queuePosition}`
-                  : ""}{" "}
-                ·{" "}
+                已报名 ·{" "}
                 {current().appliedAt
                   ? new Date(current().appliedAt!).toLocaleString()
-                  : "等待管理员确认"}{" "}
+                  : "等待管理员确认参赛"}{" "}
                 <Show when={current().waitlisted}>
                   <span class="badge badge-soft-warning">候补</span>
                 </Show>
@@ -126,7 +122,6 @@ export function RegistrationBanner() {
             <Show when={current().competitionStatus === "PLAYER"}>
               <p>
                 <span class="badge badge-soft-success">参赛选手</span>{" "}
-                请按场次阶段管理比赛牌组。
               </p>
             </Show>
             <Show when={message()}>

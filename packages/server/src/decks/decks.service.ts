@@ -77,7 +77,7 @@ export class DecksService {
     tx: Parameters<Parameters<PrismaService["$transaction"]>[0]>[0],
     matchId: number,
   ) {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(22002, ${matchId})`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(22002, ${matchId})`;
   }
 
   async createDeck(userId: number, deck: CreateDeckDto): Promise<DeckModel> {
