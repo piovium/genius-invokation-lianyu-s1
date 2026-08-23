@@ -49,6 +49,7 @@ export interface TournamentGame {
   startedAt: string | null;
   finishedAt: string | null;
   runtimeStatus?: "WAITING" | "PLAYING" | "FINALIZING" | null;
+  roomId?: number | null;
   players: GamePlayer[];
 }
 
