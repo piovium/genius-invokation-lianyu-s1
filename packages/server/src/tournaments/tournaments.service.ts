@@ -51,7 +51,7 @@ export class TournamentsService {
     action: string,
     targetType: string,
     targetId: number | string,
-    reason: string,
+    reason?: string,
     before?: unknown,
     after?: unknown,
   ) {
@@ -236,7 +236,7 @@ export class TournamentsService {
     });
   }
 
-  async advanceEvent(actorUserId: number, id: number, reason: string) {
+  async advanceEvent(actorUserId: number, id: number, reason?: string) {
     return this.prisma.$transaction(async (tx) => {
       await this.lockEvent(tx, id);
       const event = await tx.tournamentEvent.findUniqueOrThrow({
@@ -392,7 +392,7 @@ export class TournamentsService {
     });
   }
 
-  createGame(actorUserId: number, matchId: number, reason: string) {
+  createGame(actorUserId: number, matchId: number, reason?: string) {
     return this.prisma.$transaction(async (tx) => {
       await this.lock(tx, matchId);
       const game = await this.createNextGameTx(tx, matchId, false);
@@ -799,7 +799,7 @@ export class TournamentsService {
     }
   }
 
-  async autoWin(actorUserId: number, matchId: number, reason: string) {
+  async autoWin(actorUserId: number, matchId: number, reason?: string) {
     return this.prisma.$transaction(async (tx) => {
       await this.lock(tx, matchId);
       const match = await tx.tournamentMatch.findUniqueOrThrow({
@@ -1106,8 +1106,15 @@ export class TournamentsService {
     actorUserId: number,
     userIds: number[],
     status: "NONE" | "REGISTERED" | "PLAYER",
-    reason: string,
+    reason?: string,
   ) {
+    if (status !== "PLAYER" && !reason?.trim()) {
+      throw new BusinessException(
+        "ADMIN_REASON_REQUIRED",
+        "取消报名或强制退赛必须填写原因",
+        400,
+      );
+    }
     const results = [];
     for (const userId of userIds) {
       try {
