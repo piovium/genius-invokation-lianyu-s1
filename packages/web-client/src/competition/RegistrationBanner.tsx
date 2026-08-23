@@ -1,4 +1,5 @@
 import axios from "axios";
+import { A } from "@solidjs/router";
 import {
   Show,
   createEffect,
@@ -100,7 +101,20 @@ export function RegistrationBanner() {
   };
 
   return (
-    <Show when={user()}>
+    <Show
+      when={user()}
+      fallback={
+        <section class="mb-5 rounded-xl b-2 b-amber-3 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div>
+            <div class="font-bold text-lg">恋雨杯 S1</div>
+            <p>{registrationMessage()}</p>
+          </div>
+          <A class="btn btn-solid-green" href="/register">
+            前往注册账号并报名
+          </A>
+        </section>
+      }
+    >
       {(current) => (
         <section class="mb-5 rounded-xl b-2 b-amber-3 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
@@ -143,7 +157,7 @@ export function RegistrationBanner() {
             }
           >
             <button
-              class="btn btn-solid-primary"
+              class="btn btn-solid-green"
               disabled={busy() || settings()?.isOpen === false}
               onClick={apply}
             >
