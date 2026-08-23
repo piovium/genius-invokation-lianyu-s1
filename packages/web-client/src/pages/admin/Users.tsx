@@ -56,7 +56,7 @@ export default function AdminUsers() {
       const failed = data.results.filter((item) => !item.ok);
       setSelected(failed.map((item) => item.userId));
       setResult(
-        `成功 ${data.results.length - failed.length} 人，失败 ${failed.length} 人${failed.length ? `：${failed.map((x) => `#${x.userId} ${x.error}`).join("；")}` : "；审计日志已记录。"}`,
+        `成功 ${data.results.length - failed.length} 人，失败 ${failed.length} 人${failed.length ? `：${failed.map((x) => `#${x.userId} ${x.error}`).join("；")}` : "。"}`,
       );
       setTarget(null);
       refetch();
@@ -259,7 +259,7 @@ export default function AdminUsers() {
         title={
           target() === "PLAYER" ? "批量设为参赛选手" : "取消报名 / 强制退赛"
         }
-        description={`将处理 ${selected().length} 位用户。开放对局中的用户会逐项失败并保留选择。`}
+        description={`将处理 ${selected().length} 位用户`}
         busy={busy()}
         onCancel={() => setTarget(null)}
         onConfirm={batch}

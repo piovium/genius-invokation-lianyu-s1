@@ -37,7 +37,7 @@ export class RegistrationService {
     });
     if (verifyMembership) await this.qqGroup.findMember(user.qq, true);
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(22001, ${userId})`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(22001, ${userId})`;
       const current = await tx.user.findUniqueOrThrow({
         where: { id: userId },
       });
@@ -82,11 +82,11 @@ export class RegistrationService {
       );
     }
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(22001, ${userId})`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(22001, ${userId})`;
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
       let closedGameIds: number[] = [];
       if (user.activeMatchId) {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(22002, ${user.activeMatchId})`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(22002, ${user.activeMatchId})`;
         if (isPlayerInRunningRoom(userId)) {
           throw new BusinessException(
             "USER_IN_RUNNING_GAME",
