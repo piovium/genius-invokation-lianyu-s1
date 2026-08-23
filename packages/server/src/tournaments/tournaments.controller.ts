@@ -208,6 +208,12 @@ export class AdminTournamentsController {
     private readonly decks: DecksService,
   ) {}
 
+  private async reserveGame(gameId: number) {
+    const reservation =
+      await this.tournaments.tournamentRoomReservation(gameId);
+    return this.rooms.reserveTournamentGame(reservation);
+  }
+
   @Get("registration/settings")
   settings() {
     return this.tournaments.registrationSettings();
@@ -268,8 +274,15 @@ export class AdminTournamentsController {
   }
 
   @Post("events")
-  createEvent(@User() actor: number, @Body() dto: CreateEventDto) {
-    return this.tournaments.createEvent(actor, dto);
+  async createEvent(@User() actor: number, @Body() dto: CreateEventDto) {
+    const event = await this.tournaments.createEvent(actor, dto);
+    const gameIds = event.matches.flatMap((match) =>
+      match.games
+        .filter((game) => game.status === "PENDING")
+        .map((game) => game.id),
+    );
+    await Promise.all(gameIds.map((gameId) => this.reserveGame(gameId)));
+    return event;
   }
 
   @Get("events/:id")
@@ -293,6 +306,9 @@ export class AdminTournamentsController {
     @Body() dto?: OptionalReasonDto,
   ) {
     const result = await this.tournaments.advanceEvent(actor, id, dto?.reason);
+    await Promise.all(
+      result.createdGameIds.map((gameId) => this.reserveGame(gameId)),
+    );
     if (result.phase === "FINISHED") {
       for (const gameId of result.closedGameIds) {
         await this.rooms.finalizeAdminTournamentGame(gameId, (snapshot) =>
@@ -334,12 +350,14 @@ export class AdminTournamentsController {
   }
 
   @Post("matches/:id/games")
-  createGame(
+  async createGame(
     @User() actor: number,
     @Param("id", ParseIntPipe) id: number,
     @Body() dto?: OptionalReasonDto,
   ) {
-    return this.tournaments.createGame(actor, id, dto?.reason);
+    const game = await this.tournaments.createGame(actor, id, dto?.reason);
+    if (game) await this.reserveGame(game.id);
+    return game;
   }
 
   @Post("matches/:id/auto-win")
@@ -409,9 +427,17 @@ export class TournamentGamesController {
     private readonly rooms: RoomsService,
   ) {}
 
+  private async reserveGame(gameId: number) {
+    const reservation =
+      await this.tournaments.tournamentRoomReservation(gameId);
+    return this.rooms.reserveTournamentGame(reservation);
+  }
+
   @Get(":id/join-options")
-  options(@User() userId: number, @Param("id", ParseIntPipe) id: number) {
-    return this.tournaments.joinOptions(id, userId);
+  async options(@User() userId: number, @Param("id", ParseIntPipe) id: number) {
+    const options = await this.tournaments.joinOptions(id, userId);
+    const room = await this.reserveGame(id);
+    return { ...options, room };
   }
 
   @Post(":id/join")
@@ -427,11 +453,16 @@ export class TournamentGamesController {
       roomConfig: roomData.roomConfig,
       ensurePending: () => this.tournaments.assertGameJoinable(id, userId),
       markStarted: () => this.tournaments.markGameStarted(id),
-      finalize: (result) =>
-        this.tournaments.finalizeGame({
+      finalize: async (result) => {
+        const finalized = await this.tournaments.finalizeGame({
           gameId: id,
           ...result,
-        }),
+        });
+        if (finalized.nextGameId !== null) {
+          await this.reserveGame(finalized.nextGameId);
+        }
+        return finalized.game;
+      },
     });
   }
 }
