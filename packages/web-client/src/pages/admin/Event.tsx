@@ -22,6 +22,8 @@ export default function AdminEvent() {
   const [message, setMessage] = createSignal("");
   const [renaming, setRenaming] = createSignal(false);
   const [renameError, setRenameError] = createSignal("");
+  const [editingDeckLimit, setEditingDeckLimit] = createSignal(false);
+  const [deckLimitError, setDeckLimitError] = createSignal("");
   const advance = async () => {
     const current = event();
     if (!current) return;
@@ -71,6 +73,31 @@ export default function AdminEvent() {
       refetch();
     } catch (e) {
       setRenameError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const editDeckLimit = async (submitEvent: SubmitEvent) => {
+    submitEvent.preventDefault();
+    const current = event();
+    if (!current) return;
+    const form = new FormData(submitEvent.currentTarget as HTMLFormElement);
+    const deckLimit = Number(form.get("deckLimit"));
+    if (!Number.isInteger(deckLimit) || deckLimit < 0 || deckLimit > 100) {
+      setDeckLimitError("牌组上限必须是 0 到 100 之间的整数。");
+      return;
+    }
+    setBusy(true);
+    setDeckLimitError("");
+    try {
+      await axios.patch(`admin/events/${current.id}`, {
+        deckLimit,
+      });
+      setEditingDeckLimit(false);
+      setMessage("牌组上限已修改。");
+      refetch();
+    } catch (e) {
+      setDeckLimitError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -146,7 +173,19 @@ export default function AdminEvent() {
                 </p>
               </div>
               <div>
-                <small class="text-gray-5">牌组上限</small>
+                <div class="flex items-center gap-2">
+                  <small class="text-gray-5">牌组上限</small>
+                  <button
+                    class="text-xs text-blue-6 hover:underline disabled:text-gray-4 disabled:no-underline"
+                    disabled={data().phase !== "DECK_COLLECTION"}
+                    onClick={() => {
+                      setDeckLimitError("");
+                      setEditingDeckLimit(true);
+                    }}
+                  >
+                    编辑
+                  </button>
+                </div>
                 <p>{data().deckLimit || "不限"}</p>
               </div>
               <div>
@@ -277,6 +316,50 @@ export default function AdminEvent() {
                 </button>
                 <button class="btn btn-solid-primary" disabled={busy()}>
                   {busy() ? "正在保存…" : "保存名称"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </Show>
+      <Show when={editingDeckLimit() && event()}>
+        {(data) => (
+          <div class="fixed inset-0 z-300 bg-black/40 flex items-center justify-center p-4">
+            <form
+              class="bg-white rounded-xl shadow-xl p-5 w-full max-w-110"
+              onSubmit={editDeckLimit}
+            >
+              <h3 class="text-xl font-bold">修改牌组上限</h3>
+              <label class="flex flex-col gap-1 mt-3">
+                <span>牌组上限（0 不限）</span>
+                <input
+                  name="deckLimit"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  class="input input-solid"
+                  value={data().deckLimit}
+                  autofocus
+                  required
+                />
+              </label>
+              <Show when={deckLimitError()}>
+                <div class="alert alert-border-error mt-3">
+                  <p>{deckLimitError()}</p>
+                </div>
+              </Show>
+              <div class="flex justify-end gap-3 mt-4">
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  disabled={busy()}
+                  onClick={() => setEditingDeckLimit(false)}
+                >
+                  取消
+                </button>
+                <button class="btn btn-solid-primary" disabled={busy()}>
+                  {busy() ? "正在保存…" : "保存上限"}
                 </button>
               </div>
             </form>

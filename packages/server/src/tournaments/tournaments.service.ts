@@ -359,11 +359,10 @@ export class TournamentsService {
       });
       if (before.event.phase === "FINISHED")
         throw new ConflictException("EVENT_PHASE_MISMATCH");
-      if (
-        before.event.phase === "RUNNING" &&
-        (dto.mode || dto.maxGames || dto.winsRequired || dto.roomConfig)
-      ) {
-        throw new ConflictException("EVENT_PHASE_MISMATCH");
+      const maxGames = dto.maxGames ?? before.maxGames;
+      const winsRequired = dto.winsRequired ?? before.winsRequired;
+      if (maxGames < winsRequired) {
+        throw new ConflictException("maxGames must be >= winsRequired");
       }
       const after = await tx.tournamentMatch.update({
         where: { id },
