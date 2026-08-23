@@ -144,7 +144,7 @@ export default function AdminMatch() {
   const editMatch = async (event: SubmitEvent) => {
     event.preventDefault();
     const data = match();
-    if (!data || data.event?.phase !== "DECK_COLLECTION") return;
+    if (!data || data.event?.phase === "FINISHED") return;
     const form = new FormData(event.currentTarget as HTMLFormElement);
     const maxGames = Number(form.get("maxGames"));
     const winsRequired = Number(form.get("winsRequired"));
@@ -237,7 +237,7 @@ export default function AdminMatch() {
         <div class="flex flex-wrap gap-2">
           <button
             class="btn btn-outline"
-            disabled={!match() || match()?.event?.phase !== "DECK_COLLECTION"}
+            disabled={!match() || match()?.event?.phase === "FINISHED"}
             onClick={() => {
               setEditError("");
               setEditingMatch(true);
@@ -406,14 +406,14 @@ export default function AdminMatch() {
                         </td>
                         <td class="table-cell">
                           <button
-                            class="text-orange-6 mr-3"
+                            class="btn btn-ghost-orange"
                             onClick={() => setSelectedGame(game)}
                           >
                             管理员介入
                           </button>
                           <Show when={game.stateLog}>
                             <button
-                              class="text-blue-6"
+                              class="btn btn-ghost-blue"
                               onClick={() => downloadLog(game)}
                             >
                               日志

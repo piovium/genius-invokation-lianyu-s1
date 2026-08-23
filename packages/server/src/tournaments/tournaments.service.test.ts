@@ -1,0 +1,125 @@
+// Copyright (C) 2024-2026 Guyutongxue
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("#prisma/client", () => ({ Prisma: {} }));
+vi.mock("@gi-tcg/core", () => ({
+  CORE_VERSION: "test-core-version",
+  CURRENT_VERSION: "test-game-version",
+}));
+vi.mock("../db/prisma.service", () => ({ PrismaService: class {} }));
+vi.mock("../decks/decks.service", () => ({ characterKey: vi.fn() }));
+vi.mock("../rooms/room-runtime", () => ({
+  isPlayerInRunningRoom: vi.fn(),
+}));
+vi.mock("../utils", () => ({
+  ASSETS_MANAGER: { decode: vi.fn() },
+  MATCH_CONFIG_VERSION: "",
+}));
+
+import { TournamentsService } from "./tournaments.service";
+
+const transactionClient = (overrides: Record<string, unknown> = {}) => ({
+  $executeRaw: vi.fn(),
+  auditLog: { create: vi.fn() },
+  ...overrides,
+});
+
+describe("TournamentsService running match administration", () => {
+  it("updates match configuration while running and audits before and after", async () => {
+    const before = {
+      id: 7,
+      eventId: 3,
+      event: { id: 3, phase: "RUNNING" },
+      mode: "DUEL",
+      maxGames: 3,
+      winsRequired: 2,
+      roomConfig: {},
+    };
+    const after = {
+      ...before,
+      mode: "CONQUEST",
+      maxGames: 5,
+      winsRequired: 3,
+      roomConfig: { watchable: false },
+    };
+    const tx = transactionClient({
+      tournamentMatch: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue(before),
+        update: vi.fn().mockResolvedValue(after),
+      },
+    });
+    const prisma = {
+      tournamentMatch: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ eventId: 3 }),
+      },
+      $transaction: vi.fn(async (operation) => operation(tx)),
+    };
+    const service = new TournamentsService(prisma as never);
+
+    await expect(
+      service.patchMatch(11, 7, {
+        mode: "CONQUEST",
+        maxGames: 5,
+        winsRequired: 3,
+        roomConfig: { watchable: false },
+      }),
+    ).resolves.toBe(after);
+
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: 11,
+        action: "MATCH_UPDATE",
+        targetType: "TournamentMatch",
+        targetId: "7",
+        before,
+        after,
+      }),
+    });
+  });
+
+  it("manually creates a game while running and audits it", async () => {
+    const game = {
+      id: 19,
+      matchId: 7,
+      players: [
+        { who: 0, userId: 101 },
+        { who: 1, userId: 102 },
+      ],
+    };
+    const tx = transactionClient({
+      tournamentMatch: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 7,
+          event: { phase: "RUNNING" },
+          participants: [
+            { who: 0, userId: 101 },
+            { who: 1, userId: 102 },
+          ],
+          games: [],
+          winnerUserId: null,
+          maxGames: 3,
+          autoCreateGame: false,
+        }),
+      },
+      game: { create: vi.fn().mockResolvedValue(game) },
+    });
+    const prisma = {
+      $transaction: vi.fn(async (operation) => operation(tx)),
+    };
+    const service = new TournamentsService(prisma as never);
+
+    await expect(service.createGame(11, 7)).resolves.toBe(game);
+
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: 11,
+        action: "GAME_CREATE",
+        targetType: "TournamentMatch",
+        targetId: "7",
+        after: game,
+      }),
+    });
+  });
+});
