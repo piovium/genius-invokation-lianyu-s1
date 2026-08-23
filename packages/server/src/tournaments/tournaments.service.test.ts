@@ -122,4 +122,50 @@ describe("TournamentsService running match administration", () => {
       }),
     });
   });
+
+  it("unassigns a participant deck and records the administrative reason", async () => {
+    const current = {
+      id: 31,
+      matchId: 7,
+      userId: 101,
+      sourceDeckId: 23,
+      name: "Test deck",
+    };
+    const deleteMatchDeck = vi.fn().mockResolvedValue(current);
+    const tx = transactionClient({
+      tournamentMatch: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 7,
+          event: { phase: "RUNNING" },
+        }),
+      },
+      matchParticipant: {
+        findUnique: vi.fn().mockResolvedValue({ matchId: 7, userId: 101 }),
+      },
+      matchDeck: {
+        findFirst: vi.fn().mockResolvedValue(current),
+        delete: deleteMatchDeck,
+      },
+    });
+    const prisma = {
+      $transaction: vi.fn(async (operation) => operation(tx)),
+    };
+    const service = new TournamentsService(prisma as never);
+
+    await expect(
+      service.unassignDeck(11, 7, 101, 23, "Incorrect assignment"),
+    ).resolves.toBe(current);
+
+    expect(deleteMatchDeck).toHaveBeenCalledWith({ where: { id: 31 } });
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: 11,
+        action: "MATCH_DECK_UNASSIGN",
+        targetType: "MatchDeck",
+        targetId: "31",
+        reason: "Incorrect assignment",
+        before: current,
+      }),
+    });
+  });
 });
