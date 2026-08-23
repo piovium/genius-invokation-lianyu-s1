@@ -105,11 +105,11 @@ export function Login() {
           />
         </label>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button class="btn btn-solid-primary" type="submit" disabled={busy()}>
+          <button class="btn btn-outline-primary" type="submit" disabled={busy()}>
             {busy() ? "正在登录…" : "密码登录"}
           </button>
           <button
-            class="btn btn-outline-primary"
+            class="btn btn-solid-primary"
             type="button"
             disabled={
               busy() || !/^\d{5,12}$/.test(qq()) || !isPasskeySupported()
