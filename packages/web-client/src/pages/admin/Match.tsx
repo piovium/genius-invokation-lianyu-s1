@@ -267,6 +267,13 @@ export default function AdminMatch() {
   return (
     <AdminPage
       title={`盘次 #${params.id}`}
+      breadcrumbs={[
+        { title: "比赛场次", href: "/admin/events" },
+        {
+          title: match()?.event?.name ?? "场次详情",
+          href: `/admin/events/${match()?.eventId ?? ""}`,
+        },
+      ]}
       actions={
         <div class="flex flex-wrap gap-2">
           <button
