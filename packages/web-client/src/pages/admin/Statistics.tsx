@@ -94,7 +94,7 @@ export default function Statistics() {
           </For>
         </div>
         <div class="alert alert-border-info text-sm">
-          本页按模拟器原始赢家统计，并排除“不计入统计”的对局；排名和小分按盘次赢家计算，管理员裁定可能使二者不同。出场率分母为
+          本页按模拟器原始赢家统计，并排除“不计入统计”的对局；出场率分母为
           2 × 对局数。
         </div>
       </div>
