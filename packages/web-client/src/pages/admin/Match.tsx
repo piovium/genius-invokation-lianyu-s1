@@ -96,6 +96,8 @@ export default function AdminMatch() {
   const [selectedGame, setSelectedGame] = createSignal<TournamentGame | null>(
     null,
   );
+  const [editingMatch, setEditingMatch] = createSignal(false);
+  const [editError, setEditError] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   let timer: number | undefined;
   onMount(
@@ -139,28 +141,34 @@ export default function AdminMatch() {
       setMessage(errorMessage(e));
     }
   };
-  const editMatch = async () => {
+  const editMatch = async (event: SubmitEvent) => {
+    event.preventDefault();
     const data = match();
-    if (!data || data.event?.phase === "FINISHED") return;
-    const maxGames = prompt("总局数", String(data.maxGames));
-    if (maxGames === null) return;
-    const winsRequired = prompt("胜局数", String(data.winsRequired));
-    if (winsRequired === null) return;
-    const mode = prompt("模式：UNRESTRICTED / DUEL / CONQUEST", data.mode);
-    if (!mode) return;
-    const roomConfig = prompt("房间配置 JSON", JSON.stringify(data.roomConfig));
-    if (roomConfig === null) return;
+    if (!data || data.event?.phase !== "DECK_COLLECTION") return;
+    const form = new FormData(event.currentTarget as HTMLFormElement);
+    const maxGames = Number(form.get("maxGames"));
+    const winsRequired = Number(form.get("winsRequired"));
+    if (maxGames < winsRequired) {
+      setEditError("总局数必须大于等于胜局数。");
+      return;
+    }
+    setBusy(true);
+    setEditError("");
     try {
+      const roomConfig = JSON.parse(String(form.get("roomConfig") || "{}"));
       await axios.patch(`admin/matches/${data.id}`, {
-        maxGames: Number(maxGames),
-        winsRequired: Number(winsRequired),
-        mode,
-        roomConfig: JSON.parse(roomConfig),
+        maxGames,
+        winsRequired,
+        mode: String(form.get("mode")),
+        roomConfig,
       });
+      setEditingMatch(false);
       refetch();
       setMessage("盘次配置已更新。");
     } catch (e) {
-      setMessage(errorMessage(e));
+      setEditError(errorMessage(e));
+    } finally {
+      setBusy(false);
     }
   };
   const setWinner = async () => {
@@ -229,8 +237,11 @@ export default function AdminMatch() {
         <div class="flex flex-wrap gap-2">
           <button
             class="btn btn-outline"
-            disabled={!match() || match()?.event?.phase === "FINISHED"}
-            onClick={editMatch}
+            disabled={!match() || match()?.event?.phase !== "DECK_COLLECTION"}
+            onClick={() => {
+              setEditError("");
+              setEditingMatch(true);
+            }}
           >
             编辑盘次配置
           </button>
@@ -269,7 +280,9 @@ export default function AdminMatch() {
       }
     >
       <Show when={message()}>
-        <div class="alert alert-border-info mb-3">{message()}</div>
+        <div class="alert alert-border-info mb-3">
+          <p>{message()}</p>
+        </div>
       </Show>
       <Show when={match()}>
         {(data) => (
@@ -339,37 +352,37 @@ export default function AdminMatch() {
               </For>
             </div>
             <h3 class="font-bold text-lg mb-2">对局列表</h3>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto table-root">
               <table class="table w-full">
-                <thead>
-                  <tr>
-                    <th>对局</th>
-                    <th>状态</th>
-                    <th>先后手 / 牌组</th>
-                    <th>原始 / 裁定赢家</th>
-                    <th>结束原因</th>
-                    <th>回合数</th>
-                    <th>计入统计</th>
-                    <th>操作</th>
+                <thead class="table-header">
+                  <tr class="table-row">
+                    <th class="table-head">对局</th>
+                    <th class="table-head">状态</th>
+                    <th class="table-head">先后手 / 牌组</th>
+                    <th class="table-head">原始 / 裁定赢家</th>
+                    <th class="table-head">结束原因</th>
+                    <th class="table-head">回合数</th>
+                    <th class="table-head">计入统计</th>
+                    <th class="table-head">操作</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody class="table-body">
                   <For each={data().games}>
                     {(game) => (
-                      <tr>
-                        <td>
+                      <tr class="table-row">
+                        <td class="table-cell">
                           #{game.id}
                           <br />
                           <small>{fmt(game.createdAt)}</small>
                         </td>
-                        <td>
+                        <td class="table-cell">
                           {game.status === "PENDING"
                             ? game.startedAt
                               ? "进行中（内存）"
                               : "未开始"
                             : "已结束"}
                         </td>
-                        <td>
+                        <td class="table-cell">
                           <For each={game.players}>
                             {(player) => (
                               <div>
@@ -382,14 +395,16 @@ export default function AdminMatch() {
                             )}
                           </For>
                         </td>
-                        <td>
+                        <td class="table-cell">
                           {game.winnerWho ?? "—"} /{" "}
                           {game.manualWinnerWho ?? "—"}
                         </td>
-                        <td>{game.endReason ?? "—"}</td>
-                        <td>{game.roundCount ?? "—"}</td>
-                        <td>{game.countForStats ? "是" : "否"}</td>
-                        <td>
+                        <td class="table-cell">{game.endReason ?? "—"}</td>
+                        <td class="table-cell">{game.roundCount ?? "—"}</td>
+                        <td class="table-cell">
+                          {game.countForStats ? "是" : "否"}
+                        </td>
+                        <td class="table-cell">
                           <button
                             class="text-orange-6 mr-3"
                             onClick={() => setSelectedGame(game)}
@@ -424,7 +439,7 @@ export default function AdminMatch() {
               <h3 class="text-xl font-bold">介入对局 #{game().id}</h3>
               <Show when={game().status === "PENDING" && game().startedAt}>
                 <div class="alert alert-border-warning my-3">
-                  该局可能正在运行，提交将立即中止双方当前游戏。
+                  <p>该局可能正在运行，提交将立即中止双方当前游戏。</p>
                 </div>
               </Show>
               <label class="flex flex-col gap-1 mt-3">
@@ -473,6 +488,81 @@ export default function AdminMatch() {
                 </button>
                 <button class="btn btn-solid-error" disabled={busy()}>
                   确认介入
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </Show>
+      <Show when={editingMatch() && match()}>
+        {(data) => (
+          <div class="fixed inset-0 z-300 bg-black/40 flex items-center justify-center p-4">
+            <form
+              class="bg-white rounded-xl shadow-xl p-5 w-full max-w-150 max-h-[calc(100vh-2rem)] overflow-auto"
+              onSubmit={editMatch}
+            >
+              <h3 class="text-xl font-bold">编辑盘次配置</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <label class="flex flex-col gap-1">
+                  <span>总局数</span>
+                  <input
+                    name="maxGames"
+                    type="number"
+                    min="1"
+                    max="99"
+                    class="input input-solid"
+                    value={data().maxGames}
+                    required
+                  />
+                </label>
+                <label class="flex flex-col gap-1">
+                  <span>胜局数</span>
+                  <input
+                    name="winsRequired"
+                    type="number"
+                    min="1"
+                    max="99"
+                    class="input input-solid"
+                    value={data().winsRequired}
+                    required
+                  />
+                </label>
+                <label class="flex flex-col gap-1 sm:col-span-2">
+                  <span>对局模式</span>
+                  <select name="mode" class="select" value={data().mode}>
+                    <option value="UNRESTRICTED">无限制</option>
+                    <option value="DUEL">决斗</option>
+                    <option value="CONQUEST">征服</option>
+                  </select>
+                </label>
+                <label class="flex flex-col gap-1 sm:col-span-2">
+                  <span>房间配置 JSON</span>
+                  <textarea
+                    name="roomConfig"
+                    class="textarea textarea-solid font-mono"
+                    rows="9"
+                    required
+                  >
+                    {JSON.stringify(data().roomConfig, null, 2)}
+                  </textarea>
+                </label>
+              </div>
+              <Show when={editError()}>
+                <div class="alert alert-border-error mt-3">
+                  <p>{editError()}</p>
+                </div>
+              </Show>
+              <div class="flex justify-end gap-3 mt-4">
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  disabled={busy()}
+                  onClick={() => setEditingMatch(false)}
+                >
+                  取消
+                </button>
+                <button class="btn btn-solid-primary" disabled={busy()}>
+                  {busy() ? "正在保存…" : "保存配置"}
                 </button>
               </div>
             </form>

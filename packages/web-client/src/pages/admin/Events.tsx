@@ -12,7 +12,7 @@ export default function AdminEvents() {
     <AdminPage
       title="比赛场次"
       actions={
-        <A class="btn btn-solid-primary" href="/admin/events/new">
+        <A class="btn btn-solid-success" href="/admin/events/new">
           <i class="i-mdi-plus" /> 创建场次
         </A>
       }
