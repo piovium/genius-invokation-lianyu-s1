@@ -22,4 +22,7 @@ function getAssetsManagerOptions(): Partial<AssetsManagerOption> {
   }
 }
 
-export const ASSETS_MANAGER = new AssetsManager(getAssetsManagerOptions());
+export const ASSETS_MANAGER = new AssetsManager({
+  ...getAssetsManagerOptions(),
+  language: "CHS",
+});

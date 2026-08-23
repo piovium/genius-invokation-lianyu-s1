@@ -17,17 +17,13 @@ import { A, useNavigate } from "@solidjs/router";
 import { Show, createSignal } from "solid-js";
 import { IS_BETA } from "@gi-tcg/config";
 import Logo from "./Logo.svg";
-import Title from "./Title.svg";
-import LanguageIcon from "./Language.svg";
 import { useAuth } from "../auth";
-import { Locale, useI18n } from "../i18n";
-
-const USE_LOGO = true;
+import { useI18n } from "../i18n";
 
 export function Header() {
   const navigate = useNavigate();
   const { status, logout, avatarUrl } = useAuth();
-  const { t, locale, setLocale } = useI18n();
+  const { t } = useI18n();
   const [menuOpen, setMenuOpen] = createSignal(false);
   const user = () => {
     const current = status();
@@ -59,7 +55,7 @@ export function Header() {
           </Show>
         </nav>
       </Show>
-      <div class="flex flex-row items-center relative">
+      {/* <div class="flex flex-row items-center relative">
         <select
           class="select h-8 text-xs border rounded-full pl-7 py-1 bg-white"
           value={locale()}
@@ -74,7 +70,7 @@ export function Header() {
           class="absolute h-6 -translate-x-50% left-4"
           alt={t("languageLabel")}
         />
-      </div>
+      </div> */}
       <Show when={status().type !== "notLogin"}>
         <button
           class="md:hidden btn btn-ghost h-9 w-9 p-1"
