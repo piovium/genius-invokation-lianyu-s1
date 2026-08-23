@@ -85,7 +85,7 @@ export default {
   guestNamePlaceholder: "起一个响亮的名字吧！",
   confirm: "确认",
   selectAvatar: "选择头像",
-  allowPopup: "请允许弹出窗口以使用 Passkey。",
+  allowPopup: "请允许弹出窗口以使用通行秘钥。",
   guestModeHint:
     "在游客模式下，牌组仅保存在本地；对局会以匿名牌组快照入库用于赛事统计。如需同步牌组和查看个人记录，请注册 QQ 账号。",
   roomConfig: "房间配置",

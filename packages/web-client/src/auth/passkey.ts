@@ -38,7 +38,7 @@ export async function createPasskey(
       })),
     } as PublicKeyCredentialCreationOptions,
   })) as PublicKeyCredential | null;
-  if (!credential) throw new Error("未创建 Passkey");
+  if (!credential) throw new Error("未创建通行秘钥");
   const response = credential.response as AuthenticatorAttestationResponse;
   return {
     id: credential.id,
@@ -66,7 +66,7 @@ export async function getPasskey(
       })),
     } as PublicKeyCredentialRequestOptions,
   })) as PublicKeyCredential | null;
-  if (!credential) throw new Error("未选择 Passkey");
+  if (!credential) throw new Error("未选择通行秘钥");
   const response = credential.response as AuthenticatorAssertionResponse;
   return {
     id: credential.id,
