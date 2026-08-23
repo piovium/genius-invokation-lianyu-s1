@@ -178,13 +178,15 @@ export default function AdminUsers() {
         </button>
       </div>
       <Show when={result()}>
-        <div class="alert alert-border-info mb-3">{result()}</div>
+        <div class="alert alert-border-info mb-3">
+          <p>{result()}</p>
+        </div>
       </Show>
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto table-root">
         <table class="table w-full">
-          <thead>
-            <tr>
-              <th>
+          <thead class="table-header">
+            <tr class="table-row">
+              <th class="table-head">
                 <input
                   type="checkbox"
                   checked={
@@ -199,19 +201,19 @@ export default function AdminUsers() {
                   }
                 />
               </th>
-              <th>昵称 / QQ</th>
-              <th>角色</th>
-              <th>报名状态</th>
-              <th>报名时间</th>
-              <th>活跃盘次 / 内存对局</th>
-              <th>注册时间</th>
+              <th class="table-head">昵称 / QQ</th>
+              <th class="table-head">角色</th>
+              <th class="table-head">报名状态</th>
+              <th class="table-head">报名时间</th>
+              <th class="table-head">活跃盘次 / 内存对局</th>
+              <th class="table-head">注册时间</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="table-body">
             <For each={users()}>
               {(user) => (
-                <tr>
-                  <td>
+                <tr class="table-row">
+                  <td class="table-cell">
                     <input
                       type="checkbox"
                       checked={selected().includes(user.id)}
@@ -224,21 +226,23 @@ export default function AdminUsers() {
                       }
                     />
                   </td>
-                  <td>
+                  <td class="table-cell">
                     <b>{user.name}</b>
                     <br />
                     <span class="text-sm text-gray-5">{user.qq}</span>
                   </td>
-                  <td>{user.role}</td>
-                  <td>{statusText[user.competitionStatus]}</td>
-                  <td>{fmt(user.appliedAt)}</td>
-                  <td>
+                  <td class="table-cell">{user.role}</td>
+                  <td class="table-cell">
+                    {statusText[user.competitionStatus]}
+                  </td>
+                  <td class="table-cell">{fmt(user.appliedAt)}</td>
+                  <td class="table-cell">
                     {user.activeMatchId ? `#${user.activeMatchId}` : "—"}
                     <Show when={user.inRunningGame}>
                       <span class="badge badge-soft-error ml-2">运行中</span>
                     </Show>
                   </td>
-                  <td>{fmt(user.createdAt)}</td>
+                  <td class="table-cell">{fmt(user.createdAt)}</td>
                 </tr>
               )}
             </For>
