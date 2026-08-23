@@ -140,6 +140,8 @@ export class TournamentsService {
           data: {
             eventId: event.id,
             ...this.templateData(dto.matchTemplate),
+            autoCreateGame:
+              participants.length === 2 && dto.matchTemplate.autoCreateGame,
             participants: { create: participants },
           },
         });
