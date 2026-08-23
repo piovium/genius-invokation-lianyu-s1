@@ -66,7 +66,7 @@ export function ReasonDialog(props: {
             <p class="my-2 text-sm text-gray-6">{props.description}</p>
           </Show>
           <label class="flex flex-col gap-1 mt-3">
-            <span>操作原因（将写入审计日志）</span>
+            <span>操作原因</span>
             <textarea
               class="textarea textarea-solid"
               maxlength={500}

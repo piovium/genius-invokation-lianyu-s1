@@ -31,7 +31,7 @@ function DeckAssignment(props: {
   const [busy, setBusy] = createSignal(false);
   const assign = async () => {
     if (selected() === null) return;
-    const reason = prompt("指定比赛牌组的原因（审计必填）");
+    const reason = prompt("指定比赛牌组的原因");
     if (!reason?.trim()) return;
     setBusy(true);
     try {
@@ -127,13 +127,13 @@ export default function AdminMatch() {
     }
   };
   const reasonAction = (url: string, success: string) => {
-    const reason = prompt("请输入操作原因（审计必填）");
+    const reason = prompt("请输入操作原因");
     if (reason?.trim()) act(url, { reason: reason.trim() }, success);
   };
   const toggleAuto = async () => {
     const data = match();
     if (!data) return;
-    const reason = prompt("修改自动开局的原因（审计必填）");
+    const reason = prompt("修改自动开局的原因");
     if (!reason?.trim()) return;
     try {
       await axios.patch(`admin/matches/${data.id}`, {
@@ -156,7 +156,7 @@ export default function AdminMatch() {
     if (!mode) return;
     const roomConfig = prompt("房间配置 JSON", JSON.stringify(data.roomConfig));
     if (roomConfig === null) return;
-    const reason = prompt("修改原因（审计必填）");
+    const reason = prompt("修改原因");
     if (!reason?.trim()) return;
     try {
       await axios.patch(`admin/matches/${data.id}`, {
@@ -180,7 +180,7 @@ export default function AdminMatch() {
       data.winnerUserId ? String(data.winnerUserId) : "",
     );
     if (value === null) return;
-    const reason = prompt("介入原因（审计必填）");
+    const reason = prompt("介入原因");
     if (!reason?.trim()) return;
     try {
       await axios.patch(`admin/matches/${data.id}/intervention`, {
