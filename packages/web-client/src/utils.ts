@@ -55,7 +55,9 @@ function isValidAvatar(avatar: string | null | undefined): avatar is string {
   return AVATAR_REGEX.test(avatar) || /^https:\/\/q1\.qlogo\.cn\//.test(avatar);
 }
 
-export function getPlayerAvatarUrl(player: PlayerInfo): string {
+export function getPlayerAvatarUrl(
+  player: Pick<PlayerInfo, "avatarUrl" | "name">,
+): string {
   if (isValidAvatar(player.avatarUrl)) {
     return player.avatarUrl;
   }
