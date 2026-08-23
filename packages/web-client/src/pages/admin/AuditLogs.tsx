@@ -30,7 +30,7 @@ export default function AuditLogs() {
               <p class="mt-2">
                 操作者：{log.actor.name}（{log.actor.qq}）
               </p>
-              <p>原因：{log.reason}</p>
+              <p>原因：{log.reason || "—"}</p>
               <details class="mt-2">
                 <summary class="cursor-pointer text-blue-6">变更详情</summary>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">

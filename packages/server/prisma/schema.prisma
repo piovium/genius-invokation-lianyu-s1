@@ -267,7 +267,7 @@ model AuditLog {
   action      String
   targetType  String
   targetId    String
-  reason      String
+  reason      String?
   before      Json?
   after       Json?
   createdAt   DateTime @default(now())
