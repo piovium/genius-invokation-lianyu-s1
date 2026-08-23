@@ -94,7 +94,7 @@ export function Login() {
           />
         </label>
         <label class="flex flex-col gap-1">
-          <span>密码</span>
+          <span>密码（防傻子环节：不是你的 QQ 密码）</span>
           <input
             class="input input-solid"
             type="password"
@@ -115,11 +115,13 @@ export function Login() {
               busy() || !/^\d{5,12}$/.test(qq()) || !isPasskeySupported()
             }
             title={
-              isPasskeySupported() ? "" : "当前环境不支持 Passkey，请使用密码"
+              isPasskeySupported()
+                ? ""
+                : "当前环境不支持通行秘钥，请使用密码"
             }
             onClick={passkeyLogin}
           >
-            使用 Passkey
+            使用通行秘钥
           </button>
         </div>
       </form>

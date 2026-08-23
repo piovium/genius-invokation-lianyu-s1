@@ -44,7 +44,9 @@ export default function Register() {
   );
   const [password, setPassword] = createSignal("");
   const [confirmPassword, setConfirmPassword] = createSignal("");
-  const [method, setMethod] = createSignal<"password" | "passkey">("password");
+  const [method, setMethod] = createSignal<"password" | "passkey">(
+    isPasskeySupported() ? "passkey" : "password",
+  );
   const [qqChecked, setQqChecked] = createSignal(false);
   const [apply, setApply] = createSignal(false);
   const [acknowledged, setAcknowledged] = createSignal(false);
@@ -198,7 +200,7 @@ export default function Register() {
               注册码{" "}
               <button
                 type="button"
-                class="text-blue-6 text-sm hover:underline"
+                class="bg-transparent text-blue-6 text-sm hover:underline"
                 onClick={() => helpDialog.showModal()}
               >
                 如何获取？
@@ -236,7 +238,7 @@ export default function Register() {
                 密码
               </label>
               <label
-                title={isPasskeySupported() ? "" : "当前环境不支持 Passkey"}
+                title={isPasskeySupported() ? "" : "当前环境不支持通行秘钥"}
               >
                 <input
                   type="radio"
@@ -245,13 +247,13 @@ export default function Register() {
                   onChange={() => setMethod("passkey")}
                   disabled={!isPasskeySupported()}
                 />{" "}
-                Passkey
+                通行秘钥
               </label>
             </div>
           </fieldset>
           <Show when={method() === "password"}>
             <label class="flex flex-col gap-1">
-              <span>密码（至少 8 位）</span>
+              <span>密码（至少 8 位，不要和你的 QQ 密码一样）</span>
               <input
                 class="input input-solid"
                 type="password"
@@ -306,7 +308,7 @@ export default function Register() {
             {busy()
               ? "正在注册…"
               : method() === "passkey"
-                ? "创建 Passkey 并注册"
+                ? "创建通行秘钥并注册"
                 : "注册"}
           </button>
         </form>
