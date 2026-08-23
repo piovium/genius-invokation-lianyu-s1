@@ -99,6 +99,16 @@ export default function AdminMatch() {
   const [editingMatch, setEditingMatch] = createSignal(false);
   const [editError, setEditError] = createSignal("");
   const [busy, setBusy] = createSignal(false);
+  const participantName = (userId: number | null) =>
+    match()?.participants.find((participant) => participant.userId === userId)
+      ?.user.name ?? "—";
+  const playerName = (game: TournamentGame, who: number | null) => {
+    if (who === null) return "—";
+    const userId = game.players.find((player) => player.who === who)?.userId;
+    return userId === undefined ? "—" : participantName(userId);
+  };
+  const turnLabel = (who: number) =>
+    who === 0 ? "先手" : who === 1 ? "后手" : "顺序未知";
   let timer: number | undefined;
   onMount(
     () =>
@@ -273,7 +283,7 @@ export default function AdminMatch() {
           >
             轮空胜利
           </button>
-          <button class="btn btn-outline-warning" onClick={setWinner}>
+          <button class="btn btn-outline-red" onClick={setWinner}>
             裁定盘次赢家
           </button>
         </div>
@@ -386,18 +396,16 @@ export default function AdminMatch() {
                           <For each={game.players}>
                             {(player) => (
                               <div>
-                                玩家 {player.who}：
-                                {data().participants.find(
-                                  (p) => p.userId === player.userId,
-                                )?.user.name ?? "—"}{" "}
-                                / {player.deckName ?? "未选牌组"}
+                                {turnLabel(player.who)}：
+                                {participantName(player.userId)} /{" "}
+                                {player.deckName ?? "未选牌组"}
                               </div>
                             )}
                           </For>
                         </td>
                         <td class="table-cell">
-                          {game.winnerWho ?? "—"} /{" "}
-                          {game.manualWinnerWho ?? "—"}
+                          {playerName(game, game.winnerWho)} /{" "}
+                          {playerName(game, game.manualWinnerWho)}
                         </td>
                         <td class="table-cell">{game.endReason ?? "—"}</td>
                         <td class="table-cell">{game.roundCount ?? "—"}</td>
@@ -457,8 +465,14 @@ export default function AdminMatch() {
                   value={game().manualWinnerWho ?? ""}
                 >
                   <option value="">无</option>
-                  <option value="0">玩家 0</option>
-                  <option value="1">玩家 1</option>
+                  <For each={game().players}>
+                    {(player) => (
+                      <option value={String(player.who)}>
+                        {participantName(player.userId)}（
+                        {turnLabel(player.who)}）
+                      </option>
+                    )}
+                  </For>
                 </select>
               </label>
               <label class="flex gap-2 mt-3">

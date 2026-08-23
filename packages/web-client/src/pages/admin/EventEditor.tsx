@@ -71,6 +71,7 @@ export default function EventEditor() {
     return result;
   });
   const user = (id: number) => users()?.find((item) => item.id === id);
+  const sideLabel = (side: 0 | 1) => (side === 0 ? "A 方" : "B 方");
   const add = (side: 0 | 1, ids: number[]) => {
     const occupied = new Set([...side0(), ...side1()]);
     const fresh = ids.filter((id) => !occupied.has(id));
@@ -147,7 +148,7 @@ export default function EventEditor() {
     <div class="rounded-xl b b-gray-2 p-3">
       <div class="flex flex-wrap justify-between gap-2 mb-2">
         <h3 class="font-bold">
-          玩家 {which} 列表（{ids.length}）
+          {sideLabel(which)}选手列表（{ids.length}）
         </h3>
         <div class="flex gap-1">
           <button
@@ -388,7 +389,7 @@ export default function EventEditor() {
               disabled={!checked().length}
               onClick={() => add(0, checked())}
             >
-              加入玩家 0
+              加入 A 方
             </button>
             <button
               type="button"
@@ -396,7 +397,7 @@ export default function EventEditor() {
               disabled={!checked().length}
               onClick={() => add(1, checked())}
             >
-              加入玩家 1
+              加入 B 方
             </button>
           </div>
           <div class="overflow-x-auto table-root">
@@ -485,7 +486,7 @@ export default function EventEditor() {
                             disabled={occupied()}
                             onClick={() => add(0, [candidate.id])}
                           >
-                            add to 0
+                            加入 A 方
                           </button>
                           <button
                             type="button"
@@ -493,7 +494,7 @@ export default function EventEditor() {
                             disabled={occupied()}
                             onClick={() => add(1, [candidate.id])}
                           >
-                            add to 1
+                            加入 B 方
                           </button>
                         </td>
                       </tr>
