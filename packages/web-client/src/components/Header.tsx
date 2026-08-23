@@ -35,15 +35,10 @@ export function Header() {
   };
   return (
     <header class="fixed top-0 left-0 w-100dvw flex flex-row h-[calc(3rem+var(--root-padding-top))] md:h-[calc(4rem+var(--root-padding-top))] pt-[var(--root-padding-top)] bg-white z-200 px-4 shadow-md items-center gap-2">
-      <img src={Logo} class="h-10 md:h-12" />
+      <A href="/">
+        <img src={Logo} class="h-10 md:h-12" />
+      </A>
       <div class="flex-grow flex flex-col md:flex-row items-start md:items-end gap-1 md:gap-2">
-        <h1 class="text-xl line-height-none font-bold">
-          <A href="/">
-            <Show when={USE_LOGO} fallback={t("platformTitle")}>
-              <img src={Title} class="h-5 md:h-6" alt={t("platformLogoAlt")} />
-            </Show>
-          </A>
-        </h1>
         <div class="flex flex-row gap-2">
           <Show when={IS_BETA}>
             <span class="text-8px md:text-10px badge badge-soft-error">
