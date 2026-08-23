@@ -72,10 +72,21 @@ export default function AdminUsers() {
     const form = new FormData(event.currentTarget as HTMLFormElement);
     setBusy(true);
     try {
+      const opens = String(form.get("opensAt") ?? "");
       const cutoff = String(form.get("cutoffAt") ?? "");
+      if (
+        opens &&
+        cutoff &&
+        new Date(opens).getTime() >= new Date(cutoff).getTime()
+      ) {
+        setResult("报名开始时间必须早于报名截止时间。");
+        return;
+      }
       await axios.patch("admin/registration/settings", {
+        opensAt: opens ? new Date(opens).toISOString() : null,
         cutoffAt: cutoff ? new Date(cutoff).toISOString() : null,
         limit: Number(form.get("limit")),
+        reason: String(form.get("reason") ?? "").trim(),
       });
       setResult("报名设置已保存。");
       refetchSettings();
@@ -89,9 +100,18 @@ export default function AdminUsers() {
   return (
     <AdminPage title="用户与报名管理">
       <form
-        class="rounded-xl b b-gray-2 p-4 mb-4 grid grid-cols-1 sm:grid-cols-[1fr_8rem_auto] gap-3 items-end"
+        class="rounded-xl b b-gray-2 p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_8rem_1fr_auto] gap-3 items-end"
         onSubmit={saveSettings}
       >
+        <label class="flex flex-col gap-1">
+          <span>报名开始时间（本地时区）</span>
+          <input
+            name="opensAt"
+            type="datetime-local"
+            class="input input-solid"
+            value={localInput(settings()?.opensAt ?? null)}
+          />
+        </label>
         <label class="flex flex-col gap-1">
           <span>报名截止时间（本地时区）</span>
           <input
@@ -109,6 +129,15 @@ export default function AdminUsers() {
             min="0"
             class="input input-solid"
             value={settings()?.limit ?? 0}
+            required
+          />
+        </label>
+        <label class="flex flex-col gap-1">
+          <span>变更原因</span>
+          <input
+            name="reason"
+            class="input input-solid"
+            maxlength="500"
             required
           />
         </label>

@@ -11,6 +11,8 @@ const messages: Record<string, string> = {
   QQ_NOT_IN_GROUP: "该 QQ 当前不在赛事群内",
   QQ_ALREADY_REGISTERED: "该 QQ 已注册",
   REGISTRATION_CLOSED: "报名已经截止",
+  REGISTRATION_NOT_STARTED: "报名尚未开始",
+  INVALID_REGISTRATION_WINDOW: "报名开始时间必须早于报名截止时间",
   DUPLICATE_CHARACTER_SET: "已有角色构成相同的比赛牌组",
   COMPETITION_DECK_LOCKED: "比赛牌组已锁定",
   COMPETITION_DECK_CHARACTERS_LOCKED: "比赛牌组不能增删角色",
