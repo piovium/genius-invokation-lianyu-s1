@@ -508,6 +508,7 @@ export class ParticipantTournamentsController {
         games: match.games.map((game) => ({
           ...game,
           runtimeStatus: this.rooms.tournamentRuntimeStatus(game.id),
+          roomId: this.rooms.tournamentRoomId(game.id),
         })),
       }));
   }

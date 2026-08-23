@@ -1,4 +1,5 @@
 import { staticDecode } from "@gi-tcg/assets-manager";
+import { A } from "@solidjs/router";
 import axios from "axios";
 import {
   For,
@@ -15,6 +16,7 @@ import { useAuth } from "../auth";
 import type { DeckInfoProps } from "../components/DeckBriefInfo";
 import { RoomDialog } from "../components/RoomDialog";
 import type { RoomInfo } from "../components/RoomInfo";
+import { roomIdToCode } from "../utils";
 
 interface TournamentJoinOptions {
   gameId: number;
@@ -188,17 +190,25 @@ export function MyMatches() {
                                 game.runtimeStatus !== "FINALIZING"
                               }
                             >
-                              <button
-                                class="btn btn-outline-primary"
-                                disabled={joiningGameId() === game.id}
-                                onClick={() => enterGame(game.id)}
-                              >
-                                {joiningGameId() === game.id
-                                  ? "加载中…"
-                                  : game.runtimeStatus === "PLAYING"
-                                    ? "重连"
+                              {game.runtimeStatus === "PLAYING" &&
+                              typeof game.roomId === "number" ? (
+                                <A
+                                  class="btn btn-outline-primary"
+                                  href={`/rooms/${roomIdToCode(game.roomId)}?player=${user()!.id}&action=1`}
+                                >
+                                  继续对局
+                                </A>
+                              ) : (
+                                <button
+                                  class="btn btn-outline-primary"
+                                  disabled={joiningGameId() === game.id}
+                                  onClick={() => enterGame(game.id)}
+                                >
+                                  {joiningGameId() === game.id
+                                    ? "加载中…"
                                     : "进入"}
-                              </button>
+                                </button>
+                              )}
                             </Show>
                           </li>
                         )}
