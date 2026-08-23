@@ -10,7 +10,7 @@ import {
   onMount,
 } from "solid-js";
 import { Portal } from "solid-js/web";
-import type { TournamentMatch } from "../api/models";
+import type { TournamentGame, TournamentMatch } from "../api/models";
 import { errorMessage } from "../api/errors";
 import { useAuth } from "../auth";
 import type { DeckInfoProps } from "../components/DeckBriefInfo";
@@ -128,6 +128,34 @@ export function MyMatches() {
                       game.players.find((p) => p.who === who)?.userId === userId
                     );
                   }).length;
+                const winnerUserId = (
+                  game: TournamentGame,
+                  who: number | null,
+                ) =>
+                  who === null
+                    ? null
+                    : (game.players.find((player) => player.who === who)
+                        ?.userId ?? null);
+                const winnerName = (
+                  game: TournamentGame,
+                  who: number | null,
+                ) => {
+                  if (who === null) return "无";
+                  const userId = winnerUserId(game, who);
+                  return (
+                    match.participants.find(
+                      (participant) => participant.userId === userId,
+                    )?.user.name ?? "未知选手"
+                  );
+                };
+                const resultColor = (game: TournamentGame) => {
+                  const userId = winnerUserId(
+                    game,
+                    game.manualWinnerWho ?? game.winnerWho,
+                  );
+                  if (userId === null) return "text-gray-5";
+                  return userId === me() ? "text-green-7" : "text-red-7";
+                };
                 return (
                   <article class="rounded-xl b b-amber-3 p-4 bg-white">
                     <div class="flex flex-wrap gap-2 justify-between">
@@ -158,7 +186,7 @@ export function MyMatches() {
                     <ul class="mt-3 flex flex-col gap-2">
                       <For each={match.games}>
                         {(game, index) => (
-                          <li class="not-first:border-t-gray-2 flex items-center justify-between">
+                          <li class="flex items-center justify-between">
                             <div>
                               <span class="font-bold">第 {index() + 1} 局</span>{" "}
                               <span class="text-sm">
@@ -173,13 +201,13 @@ export function MyMatches() {
                                         : "未开始"}
                               </span>
                               <Show when={game.status === "FINISHED"}>
-                                <span class="ml-2 text-sm">
+                                <span
+                                  class={`ml-2 text-sm font-bold ${resultColor(game)}`}
+                                >
                                   原始赢家：
-                                  {game.winnerWho === null
-                                    ? "无"
-                                    : `玩家 ${game.winnerWho}`}
+                                  {winnerName(game, game.winnerWho)}
                                   {game.manualWinnerWho !== null
-                                    ? ` · 裁定玩家 ${game.manualWinnerWho}`
+                                    ? ` · 裁定赢家：${winnerName(game, game.manualWinnerWho)}`
                                     : ""}
                                 </span>
                               </Show>
