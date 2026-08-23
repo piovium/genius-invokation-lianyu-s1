@@ -53,7 +53,7 @@
 | `/admin`             | 管理首页和异常摘要       |
 | `/admin/users`       | 报名/参赛管理            |
 | `/admin/events`      | 场次列表                 |
-| `/admin/events/new`  | 批量创建场次与盘次       |
+| `/admin/events/new`  | 创建场次与盘次       |
 | `/admin/events/:id`  | 场次详情、步进、导出     |
 | `/admin/matches/:id` | 盘次、对局和比赛牌组管理 |
 | `/admin/statistics`  | 卡牌、组合、用户业务统计 |
@@ -442,7 +442,7 @@ Passkey 流程使用 `navigator.credentials.get()`。密码/Passkey错误统一�
 - 保存前预览当前正式范围与候补人数；
 - 修改限额不会自动更改用户状态，只会重新计算候补标记。
 
-## 13. 管理员：批量创建场次
+## 13. 管理员：创建场次
 
 ### 13.1 页面结构
 
