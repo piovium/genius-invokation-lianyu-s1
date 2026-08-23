@@ -76,7 +76,7 @@ export function Login() {
       </div>
       <Show when={error()}>
         <div class="alert alert-border-error" role="alert">
-          {error()}
+          <p>{error()}</p>
         </div>
       </Show>
       <form class="flex flex-col gap-4" onSubmit={passwordLogin}>

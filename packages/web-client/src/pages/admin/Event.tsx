@@ -20,6 +20,8 @@ export default function AdminEvent() {
   );
   const [busy, setBusy] = createSignal(false);
   const [message, setMessage] = createSignal("");
+  const [renaming, setRenaming] = createSignal(false);
+  const [renameError, setRenameError] = createSignal("");
   const advance = async () => {
     const current = event();
     if (!current) return;
@@ -48,23 +50,29 @@ export default function AdminEvent() {
       setBusy(false);
     }
   };
-  const edit = async () => {
+  const rename = async (submitEvent: SubmitEvent) => {
+    submitEvent.preventDefault();
     const current = event();
     if (!current) return;
-    const name = prompt("场次名称", current.name);
-    if (!name?.trim()) return;
-    const deckLimit =
-      current.phase === "DECK_COLLECTION"
-        ? Number(prompt("牌组上限（0 不限）", String(current.deckLimit)))
-        : undefined;
+    const form = new FormData(submitEvent.currentTarget as HTMLFormElement);
+    const name = String(form.get("name") ?? "").trim();
+    if (!name) {
+      setRenameError("场次名称不能为空。");
+      return;
+    }
+    setBusy(true);
+    setRenameError("");
     try {
       await axios.patch(`admin/events/${current.id}`, {
-        name: name.trim(),
-        deckLimit,
+        name,
       });
+      setRenaming(false);
+      setMessage("场次已重命名。");
       refetch();
     } catch (e) {
-      setMessage(errorMessage(e));
+      setRenameError(errorMessage(e));
+    } finally {
+      setBusy(false);
     }
   };
   const exportJson = async () => {
@@ -87,15 +95,20 @@ export default function AdminEvent() {
   return (
     <AdminPage
       title={event()?.name ?? "场次详情"}
+      titleActions={
+        <button
+          class="btn btn-ghost-primary text-sm"
+          disabled={!event() || event()?.phase === "FINISHED"}
+          onClick={() => {
+            setRenameError("");
+            setRenaming(true);
+          }}
+        >
+          重命名
+        </button>
+      }
       actions={
         <div class="flex flex-wrap gap-2">
-          <button
-            class="btn btn-outline"
-            disabled={!event() || event()?.phase === "FINISHED"}
-            onClick={edit}
-          >
-            编辑
-          </button>
           <button class="btn btn-outline" onClick={exportJson}>
             导出 JSON
           </button>
@@ -109,14 +122,16 @@ export default function AdminEvent() {
                 开始场次
               </Match>
               <Match when={event()?.phase === "RUNNING"}>结束场次</Match>
-              <Match when={true}>步进</Match>
+              <Match when={true}>已结束</Match>
             </Switch>
           </button>
         </div>
       }
     >
       <Show when={message()}>
-        <div class="alert alert-border-info mb-3">{message()}</div>
+        <div class="alert alert-border-info mb-3">
+          <p>{message()}</p>
+        </div>
       </Show>
       <Show when={event()}>
         {(data) => (
@@ -143,20 +158,20 @@ export default function AdminEvent() {
                 <p>{fmt(data().createdAt)}</p>
               </div>
             </section>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto table-root">
               <table class="table w-full">
-                <thead>
-                  <tr>
-                    <th>盘次</th>
-                    <th>双方选手</th>
-                    <th>日程</th>
-                    <th>模式 / 赛制</th>
-                    <th>比分</th>
-                    <th>赢家</th>
-                    <th>开放局</th>
+                <thead class="table-header">
+                  <tr class="table-row">
+                    <th class="table-head">盘次</th>
+                    <th class="table-head">双方选手</th>
+                    <th class="table-head">日程</th>
+                    <th class="table-head">模式 / 赛制</th>
+                    <th class="table-head">比分</th>
+                    <th class="table-head">赢家</th>
+                    <th class="table-head">开放局</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody class="table-body">
                   <For each={data().matches}>
                     {(match) => {
                       const player = (who: number) =>
@@ -171,8 +186,8 @@ export default function AdminEvent() {
                           );
                         }).length;
                       return (
-                        <tr>
-                          <td>
+                        <tr class="table-row">
+                          <td class="table-cell">
                             <A
                               class="text-blue-6 font-bold"
                               href={`/admin/matches/${match.id}`}
@@ -180,7 +195,7 @@ export default function AdminEvent() {
                               #{match.id}
                             </A>
                           </td>
-                          <td>
+                          <td class="table-cell">
                             {player(0)?.user.name ?? "轮空"} vs{" "}
                             {player(1)?.user.name ?? "轮空"}
                             <Show
@@ -193,25 +208,25 @@ export default function AdminEvent() {
                               </span>
                             </Show>
                           </td>
-                          <td>
+                          <td class="table-cell">
                             {fmt(match.scheduledStart)}
                             <br />
                             <small>至 {fmt(match.scheduledEnd)}</small>
                           </td>
-                          <td>
+                          <td class="table-cell">
                             {modeLabel[match.mode]} · {match.maxGames} 局{" "}
                             {match.winsRequired} 胜
                           </td>
-                          <td>
+                          <td class="table-cell">
                             {wins(player(0)?.userId)} :{" "}
                             {wins(player(1)?.userId)}
                           </td>
-                          <td>
+                          <td class="table-cell">
                             {match.participants.find(
                               (p) => p.userId === match.winnerUserId,
                             )?.user.name ?? "—"}
                           </td>
-                          <td>
+                          <td class="table-cell">
                             {
                               match.games.filter((g) => g.status === "PENDING")
                                 .length
@@ -225,6 +240,47 @@ export default function AdminEvent() {
               </table>
             </div>
           </>
+        )}
+      </Show>
+      <Show when={renaming() && event()}>
+        {(data) => (
+          <div class="fixed inset-0 z-300 bg-black/40 flex items-center justify-center p-4">
+            <form
+              class="bg-white rounded-xl shadow-xl p-5 w-full max-w-110"
+              onSubmit={rename}
+            >
+              <h3 class="text-xl font-bold">重命名场次</h3>
+              <label class="flex flex-col gap-1 mt-3">
+                <span>场次名称</span>
+                <input
+                  name="name"
+                  class="input input-solid"
+                  value={data().name}
+                  maxlength={100}
+                  autofocus
+                  required
+                />
+              </label>
+              <Show when={renameError()}>
+                <div class="alert alert-border-error mt-3">
+                  <p>{renameError()}</p>
+                </div>
+              </Show>
+              <div class="flex justify-end gap-3 mt-4">
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  disabled={busy()}
+                  onClick={() => setRenaming(false)}
+                >
+                  取消
+                </button>
+                <button class="btn btn-solid-primary" disabled={busy()}>
+                  {busy() ? "正在保存…" : "保存名称"}
+                </button>
+              </div>
+            </form>
+          </div>
         )}
       </Show>
     </AdminPage>

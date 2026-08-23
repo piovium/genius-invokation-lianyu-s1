@@ -539,25 +539,29 @@ export default function Room() {
         </div>
         <Switch>
           <Match when={loading() || roomInfo.loading}>
-            <div class="mb-3 alert alert-outline-info">{t("roomLoading")}</div>
+            <div class="mb-3 alert alert-outline-info">
+              <p>{t("roomLoading")}</p>
+            </div>
           </Match>
           <Match when={roomInfo.state === "ready" && roomInfo()}>
             {(info) => (
               <Switch>
                 <Match when={!initialized() && info().status === "waiting"}>
                   <div class="mb-3 alert alert-outline-info">
-                    {t("waitingForOpponent")}
+                    <p>{t("waitingForOpponent")}</p>
                   </div>
                 </Match>
                 <Match when={info().status === "finished"}>
                   <div class="mb-3 alert alert-outline-info">
-                    {t("roomFinished")}
-                    <button
-                      class="btn btn-soft-info whitespace-normal text-center leading-tight min-h-10 px-4 py-2"
-                      onClick={downloadGameLog}
-                    >
-                      {t("downloadLog")}
-                    </button>
+                    <p>
+                      {t("roomFinished")}
+                      <button
+                        class="btn btn-soft-info whitespace-normal text-center leading-tight min-h-10 px-4 py-2"
+                        onClick={downloadGameLog}
+                      >
+                        {t("downloadLog")}
+                      </button>
+                    </p>
                   </div>
                 </Match>
               </Switch>
@@ -565,7 +569,7 @@ export default function Room() {
           </Match>
           <Match when={failed()}>
             <div class="mb-3 alert alert-outline-error">
-              {t("roomLoadFailed", { message: failed() ?? "" })}
+              <p>{t("roomLoadFailed", { message: failed() ?? "" })}</p>
             </div>
           </Match>
         </Switch>
