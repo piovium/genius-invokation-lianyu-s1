@@ -1,0 +1,1 @@
+ALTER TABLE "AuditLog" ALTER COLUMN "reason" DROP NOT NULL;

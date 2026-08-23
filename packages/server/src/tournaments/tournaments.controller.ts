@@ -3,23 +3,20 @@
 
 import {
   ArrayMaxSize,
-  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
   IsISO8601,
-  IsNotEmpty,
   IsObject,
   IsOptional,
-  IsString,
   Length,
   Max,
   Min,
   ValidateNested,
 } from "class-validator";
-import { Type, Transform } from "class-transformer";
+import { Type } from "class-transformer";
 import {
   Body,
   Controller,
@@ -48,13 +45,11 @@ import { TournamentsService } from "./tournaments.service";
 import { RoomsService } from "../rooms/rooms.service";
 import { DecksService } from "../decks/decks.service";
 import { RegistrationService } from "../registration/registration.service";
-
-export class ReasonDto {
-  @IsString()
-  @IsNotEmpty()
-  @Length(1, 500)
-  reason!: string;
-}
+import {
+  OptionalReasonDto,
+  ReasonDto,
+  StatusBatchDto,
+} from "./admin-reason.dto";
 
 class EventInputDto {
   @Length(1, 100)
@@ -98,7 +93,7 @@ export class MatchTemplateDto {
   roomConfig: Record<string, unknown> = {};
 }
 
-export class CreateEventDto extends ReasonDto {
+export class CreateEventDto extends OptionalReasonDto {
   @ValidateNested()
   @Type(() => EventInputDto)
   event!: EventInputDto;
@@ -118,7 +113,7 @@ export class CreateEventDto extends ReasonDto {
   player1Ids!: number[];
 }
 
-export class EventPatchDto extends ReasonDto {
+export class EventPatchDto extends OptionalReasonDto {
   @Length(1, 100)
   @IsOptional()
   name?: string;
@@ -130,7 +125,7 @@ export class EventPatchDto extends ReasonDto {
   deckLimit?: number;
 }
 
-export class MatchPatchDto extends ReasonDto {
+export class MatchPatchDto extends OptionalReasonDto {
   @IsISO8601()
   @IsOptional()
   scheduledStart?: string;
@@ -180,7 +175,7 @@ export class GameInterventionDto extends ReasonDto {
   countForStats!: boolean;
 }
 
-export class RegistrationSettingsDto extends ReasonDto {
+export class RegistrationSettingsDto extends OptionalReasonDto {
   @IsISO8601()
   @IsOptional()
   opensAt!: string | null;
@@ -192,17 +187,6 @@ export class RegistrationSettingsDto extends ReasonDto {
   @IsInt()
   @Min(0)
   limit!: number;
-}
-
-class StatusBatchDto extends ReasonDto {
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(500)
-  @IsInt({ each: true })
-  userIds!: number[];
-
-  @IsEnum(CompetitionStatus)
-  status!: CompetitionStatus;
 }
 
 class AssignDeckDto extends ReasonDto {
@@ -306,9 +290,9 @@ export class AdminTournamentsController {
   async advanceEvent(
     @User() actor: number,
     @Param("id", ParseIntPipe) id: number,
-    @Body() { reason }: ReasonDto,
+    @Body() dto?: OptionalReasonDto,
   ) {
-    const result = await this.tournaments.advanceEvent(actor, id, reason);
+    const result = await this.tournaments.advanceEvent(actor, id, dto?.reason);
     if (result.phase === "FINISHED") {
       for (const gameId of result.closedGameIds) {
         await this.rooms.finalizeAdminTournamentGame(gameId, (snapshot) =>
@@ -353,18 +337,18 @@ export class AdminTournamentsController {
   createGame(
     @User() actor: number,
     @Param("id", ParseIntPipe) id: number,
-    @Body() { reason }: ReasonDto,
+    @Body() dto?: OptionalReasonDto,
   ) {
-    return this.tournaments.createGame(actor, id, reason);
+    return this.tournaments.createGame(actor, id, dto?.reason);
   }
 
   @Post("matches/:id/auto-win")
   autoWin(
     @User() actor: number,
     @Param("id", ParseIntPipe) id: number,
-    @Body() { reason }: ReasonDto,
+    @Body() dto?: OptionalReasonDto,
   ) {
-    return this.tournaments.autoWin(actor, id, reason);
+    return this.tournaments.autoWin(actor, id, dto?.reason);
   }
 
   @Patch("matches/:id/intervention")

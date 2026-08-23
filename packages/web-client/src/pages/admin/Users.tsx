@@ -41,9 +41,7 @@ export default function AdminUsers() {
   const [busy, setBusy] = createSignal(false);
   const [result, setResult] = createSignal("");
 
-  const batch = async (reason: string) => {
-    const status = target();
-    if (!status) return;
+  const batch = async (status: CompetitionStatus, reason?: string) => {
     setBusy(true);
     try {
       const { data } = await axios.patch<{
@@ -51,7 +49,7 @@ export default function AdminUsers() {
       }>("admin/users/competition-status", {
         userIds: selected(),
         status,
-        reason,
+        ...(reason ? { reason } : {}),
       });
       const failed = data.results.filter((item) => !item.ok);
       setSelected(failed.map((item) => item.userId));
@@ -86,7 +84,6 @@ export default function AdminUsers() {
         opensAt: opens ? new Date(opens).toISOString() : null,
         cutoffAt: cutoff ? new Date(cutoff).toISOString() : null,
         limit: Number(form.get("limit")),
-        reason: String(form.get("reason") ?? "").trim(),
       });
       setResult("报名设置已保存。");
       refetchSettings();
@@ -100,7 +97,7 @@ export default function AdminUsers() {
   return (
     <AdminPage title="用户与报名管理">
       <form
-        class="rounded-xl b b-gray-2 p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_8rem_1fr_auto] gap-3 items-end"
+        class="rounded-xl b b-gray-2 p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_8rem_auto] gap-3 items-end"
         onSubmit={saveSettings}
       >
         <label class="flex flex-col gap-1">
@@ -129,15 +126,6 @@ export default function AdminUsers() {
             min="0"
             class="input input-solid"
             value={settings()?.limit ?? 0}
-            required
-          />
-        </label>
-        <label class="flex flex-col gap-1">
-          <span>变更原因</span>
-          <input
-            name="reason"
-            class="input input-solid"
-            maxlength="500"
             required
           />
         </label>
@@ -173,8 +161,11 @@ export default function AdminUsers() {
         <span class="flex-1" />
         <button
           class="btn btn-outline-green"
-          disabled={!selected().length}
-          onClick={() => setTarget("PLAYER")}
+          disabled={busy() || !selected().length}
+          onClick={() => {
+            if (confirm(`确认将 ${selected().length} 位用户设为参赛选手？`))
+              void batch("PLAYER");
+          }}
         >
           设为参赛选手
         </button>
@@ -255,14 +246,12 @@ export default function AdminUsers() {
         </table>
       </div>
       <ReasonDialog
-        open={target() !== null}
-        title={
-          target() === "PLAYER" ? "批量设为参赛选手" : "取消报名 / 强制退赛"
-        }
+        open={target() === "NONE"}
+        title="取消报名 / 强制退赛"
         description={`将处理 ${selected().length} 位用户`}
         busy={busy()}
         onCancel={() => setTarget(null)}
-        onConfirm={batch}
+        onConfirm={(reason) => batch("NONE", reason)}
       />
     </AdminPage>
   );

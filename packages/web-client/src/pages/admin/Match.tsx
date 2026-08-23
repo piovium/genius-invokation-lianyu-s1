@@ -126,19 +126,13 @@ export default function AdminMatch() {
       setBusy(false);
     }
   };
-  const reasonAction = (url: string, success: string) => {
-    const reason = prompt("请输入操作原因");
-    if (reason?.trim()) act(url, { reason: reason.trim() }, success);
-  };
+  const action = (url: string, success: string) => act(url, {}, success);
   const toggleAuto = async () => {
     const data = match();
     if (!data) return;
-    const reason = prompt("修改自动开局的原因");
-    if (!reason?.trim()) return;
     try {
       await axios.patch(`admin/matches/${data.id}`, {
         autoCreateGame: !data.autoCreateGame,
-        reason: reason.trim(),
       });
       refetch();
     } catch (e) {
@@ -156,15 +150,12 @@ export default function AdminMatch() {
     if (!mode) return;
     const roomConfig = prompt("房间配置 JSON", JSON.stringify(data.roomConfig));
     if (roomConfig === null) return;
-    const reason = prompt("修改原因");
-    if (!reason?.trim()) return;
     try {
       await axios.patch(`admin/matches/${data.id}`, {
         maxGames: Number(maxGames),
         winsRequired: Number(winsRequired),
         mode,
         roomConfig: JSON.parse(roomConfig),
-        reason: reason.trim(),
       });
       refetch();
       setMessage("盘次配置已更新。");
@@ -251,7 +242,7 @@ export default function AdminMatch() {
               match()?.winnerUserId !== null
             }
             onClick={() =>
-              reasonAction(`admin/matches/${params.id}/games`, "已创建新局。")
+              action(`admin/matches/${params.id}/games`, "已创建新局。")
             }
           >
             创建新局
@@ -263,7 +254,7 @@ export default function AdminMatch() {
                 .length !== 1
             }
             onClick={() =>
-              reasonAction(
+              action(
                 `admin/matches/${params.id}/auto-win`,
                 "轮空选手已自动获胜。",
               )

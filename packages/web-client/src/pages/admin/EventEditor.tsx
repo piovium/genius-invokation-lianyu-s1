@@ -129,7 +129,6 @@ export default function EventEditor() {
         },
         player0Ids: side0(),
         player1Ids: side1(),
-        reason: String(form.get("reason")),
       });
       navigate(`/admin/events/${data.id}`);
     } catch (reason) {
@@ -501,15 +500,6 @@ export default function EventEditor() {
             </table>
           </div>
         </section>
-        <label class="flex flex-col gap-1">
-          <span>创建原因</span>
-          <textarea
-            name="reason"
-            class="textarea textarea-solid"
-            maxlength={500}
-            required
-          />
-        </label>
         <Show when={error()}>
           <div class="alert alert-border-error">{error()}</div>
         </Show>

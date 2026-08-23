@@ -597,7 +597,7 @@ Room 额外保存 `tournamentGameId` 和结束原因。服务重启后内存 Roo
 | `GET /admin/statistics/users`                       | 用户胜率和使用牌组，支持 source  |
 | `GET /admin/audit-logs`                             | 审计检索                         |
 
-管理员修改接口要求 CSRF 风险可控的 Bearer token、`reason` 字段（纯编辑展示名除外）和统一 `AdminGuard`。
+管理员修改接口要求 CSRF 风险可控的 Bearer token 和统一 `AdminGuard`。创建、编辑、步进等正常流程的 `reason` 可省略；管理员介入、取消报名/强制退赛、直接指定比赛牌组等非正常流程必须提供 `reason`。
 
 场次、盘次和对局详情响应同时返回服务端计算的 `allowedActions` 及不可用原因，供管理界面正确禁用操作；这只是展示信息，mutation 接口仍需重新校验同一条件。
 

@@ -128,7 +128,7 @@ export interface AuditLog {
   action: string;
   targetType: string;
   targetId: string;
-  reason: string;
+  reason: string | null;
   before: unknown;
   after: unknown;
   createdAt: string;
