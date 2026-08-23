@@ -6,6 +6,21 @@ export type TournamentRuntimeStatus = "WAITING" | "PLAYING" | "FINALIZING";
 const playingPlayers = new Map<number | string, number>();
 const tournamentGames = new Map<number, TournamentRuntimeStatus>();
 
+export function persistedRoundCount(state: {
+  phase: string;
+  roundNumber: number;
+  winner: number | null;
+  config: { maxRoundsCount: number };
+}) {
+  const stoppedAtRoundLimit =
+    state.phase === "gameEnd" &&
+    state.winner === null &&
+    state.roundNumber >= state.config.maxRoundsCount;
+  return stoppedAtRoundLimit
+    ? Math.max(0, state.roundNumber - 1)
+    : state.roundNumber;
+}
+
 export function markPlayersPlaying(playerIds: readonly (number | string)[]) {
   for (const playerId of playerIds) {
     playingPlayers.set(playerId, (playingPlayers.get(playerId) ?? 0) + 1);

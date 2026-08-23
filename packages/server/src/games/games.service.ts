@@ -10,6 +10,7 @@ import { MetricsService } from "../metrics/metrics.service";
 import { characterKey } from "../decks/decks.service";
 
 export interface AddGameOption {
+  persistenceKey: string;
   players: {
     userId: number | null;
     deckId: number | null;
@@ -20,6 +21,7 @@ export interface AddGameOption {
   gameVersion: string;
   stateLog: unknown;
   winnerWho: number | null;
+  roundCount?: number | null;
   endReason?: "NORMAL" | "ENGINE_ERROR" | "SURRENDER";
   countForStats?: boolean;
   startedAt?: Date | null;
@@ -36,13 +38,17 @@ export class GamesService {
   ) {}
 
   async addGame(input: AddGameOption): Promise<GameModel> {
-    const game = await this.prisma.game.create({
-      data: {
+    const game = await this.prisma.game.upsert({
+      where: { persistenceKey: input.persistenceKey },
+      update: {},
+      create: {
+        persistenceKey: input.persistenceKey,
         status: "FINISHED",
         coreVersion: input.coreVersion,
         gameVersion: input.gameVersion,
         stateLog: input.stateLog as Prisma.InputJsonValue,
         winnerWho: input.winnerWho,
+        roundCount: input.roundCount,
         endReason: input.endReason ?? "NORMAL",
         countForStats:
           input.countForStats ?? input.endReason !== "ENGINE_ERROR",

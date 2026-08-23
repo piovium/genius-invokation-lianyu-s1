@@ -1,6 +1,12 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import axios from "axios";
-import { Show, createEffect, createResource, createSignal } from "solid-js";
+import {
+  Show,
+  createEffect,
+  createResource,
+  createSignal,
+  onCleanup,
+} from "solid-js";
 import { Layout } from "../layouts/Layout";
 import { useAuth } from "../auth";
 import { useGuestDecks } from "../guest";
@@ -22,7 +28,7 @@ export default function Register() {
   const auth = useAuth();
   const [params] = useSearchParams();
   const [guestDecks, { clearGuestDecks }] = useGuestDecks();
-  const [settings] = createResource(() =>
+  const [settings, { refetch: refetchSettings }] = createResource(() =>
     axios
       .get<RegistrationSettings>("registration/settings")
       .then((r) => r.data),
@@ -48,7 +54,20 @@ export default function Register() {
 
   createEffect(() => {
     const current = settings();
-    if (current) setApply(current.isOpen ?? true);
+    if (!current) return;
+    setApply(current.isOpen ?? true);
+    const now = Date.now();
+    const nextBoundary = [current.opensAt, current.cutoffAt]
+      .filter((value): value is string => !!value)
+      .map((value) => new Date(value).getTime())
+      .filter((value) => value > now)
+      .sort((a, b) => a - b)[0];
+    if (nextBoundary === undefined) return;
+    const timer = window.setTimeout(
+      () => void refetchSettings(),
+      Math.min(nextBoundary - now + 50, 2_147_483_647),
+    );
+    onCleanup(() => window.clearTimeout(timer));
   });
 
   const checkQq = async () => {
@@ -265,7 +284,10 @@ export default function Register() {
             />
             <span>
               同时报名参赛
-              <Show when={settings()?.isOpen === false}>（报名已截止）</Show>
+              <Show when={settings()?.state === "NOT_STARTED"}>
+                （报名尚未开始）
+              </Show>
+              <Show when={settings()?.state === "CLOSED"}>（报名已截止）</Show>
             </span>
           </label>
           <label class="flex gap-2 items-start">
