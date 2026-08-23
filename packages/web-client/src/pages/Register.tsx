@@ -44,9 +44,7 @@ export default function Register() {
   );
   const [password, setPassword] = createSignal("");
   const [confirmPassword, setConfirmPassword] = createSignal("");
-  const [method, setMethod] = createSignal<"password" | "passkey">(
-    isPasskeySupported() ? "passkey" : "password",
-  );
+  const [method, setMethod] = createSignal<"password" | "passkey">("password");
   const [qqChecked, setQqChecked] = createSignal(false);
   const [apply, setApply] = createSignal(false);
   const [acknowledged, setAcknowledged] = createSignal(false);
@@ -175,7 +173,7 @@ export default function Register() {
             <span>QQ 号</span>
             <div class="flex gap-2">
               <input
-                class="input input-solid flex-1"
+                class="input input-solid line-height-8 flex-1"
                 inputmode="numeric"
                 pattern="\d{5,12}"
                 value={qq()}
@@ -187,27 +185,28 @@ export default function Register() {
               />
               <button
                 type="button"
-                class="btn btn-outline-primary"
+                class="btn btn-solid-primary h-8.5 py-0"
                 onClick={checkQq}
                 disabled={busy() || !/^\d{5,12}$/.test(qq())}
               >
                 {qqChecked() ? "已验证" : "验证群成员"}
               </button>
             </div>
+            <p class="text-xs text-gray-5">为便于赛事组织管理，仅允许赛事群成员注册账号，请理解。</p>
           </label>
           <label class="flex flex-col gap-1">
             <span>
-              注册码{" "}
+              注册验证码{" "}
               <button
                 type="button"
                 class="bg-transparent text-blue-6 text-sm hover:underline"
                 onClick={() => helpDialog.showModal()}
               >
-                如何获取？
+                → 如何获取？
               </button>
             </span>
             <input
-              class="input input-solid"
+              class="input input-solid line-height-8"
               value={code()}
               onInput={(e) => setCode(e.currentTarget.value.trim())}
               disabled={!qqChecked()}
@@ -217,7 +216,7 @@ export default function Register() {
           <label class="flex flex-col gap-1">
             <span>昵称</span>
             <input
-              class="input input-solid"
+              class="input input-solid line-height-8"
               maxlength={64}
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}
@@ -226,7 +225,7 @@ export default function Register() {
             />
           </label>
           <fieldset class="b b-gray-2 rounded-lg p-3">
-            <legend class="px-2">认证方式</legend>
+            <legend class="px-2">登录认证方式</legend>
             <div class="flex gap-5">
               <label>
                 <input
@@ -251,11 +250,12 @@ export default function Register() {
               </label>
             </div>
           </fieldset>
+          <p class="text-xs text-gray-5">当前只支持选择 1 种登录认证方式。如果您不了解通行密钥如何使用，推荐选择密码登录。</p>
           <Show when={method() === "password"}>
             <label class="flex flex-col gap-1">
-              <span>密码（至少 8 位，不要和你的 QQ 密码一样）</span>
+              <span>密码</span>
               <input
-                class="input input-solid"
+                class="input input-solid line-height-8"
                 type="password"
                 autocomplete="new-password"
                 minlength={8}
@@ -263,11 +263,12 @@ export default function Register() {
                 onInput={(e) => setPassword(e.currentTarget.value)}
                 required
               />
+              <p class="text-xs text-gray-5">不少于 8 位，不要与 QQ 密码相同。</p>
             </label>
             <label class="flex flex-col gap-1">
               <span>确认密码</span>
               <input
-                class="input input-solid"
+                class="input input-solid line-height-8"
                 type="password"
                 autocomplete="new-password"
                 minlength={8}
@@ -277,23 +278,25 @@ export default function Register() {
               />
             </label>
           </Show>
-          <label class="flex gap-2 items-start">
+          <label class="flex gap-2 items-center">
             <input
+              class="checkbox"
               type="checkbox"
               checked={apply()}
               onChange={(e) => setApply(e.currentTarget.checked)}
               disabled={settings()?.isOpen === false}
             />
             <span>
-              同时报名参赛
+              同时报名参赛 恋雨杯S1
               <Show when={settings()?.state === "NOT_STARTED"}>
                 （报名尚未开始）
               </Show>
               <Show when={settings()?.state === "CLOSED"}>（报名已截止）</Show>
             </span>
           </label>
-          <label class="flex gap-2 items-start">
+          <label class="flex gap-2 items-center">
             <input
+              class="checkbox"
               type="checkbox"
               checked={acknowledged()}
               onChange={(e) => setAcknowledged(e.currentTarget.checked)}
@@ -302,7 +305,7 @@ export default function Register() {
             <span>我已知晓比赛需在本模拟器中进行</span>
           </label>
           <button
-            class="btn btn-solid-primary"
+            class="btn btn-solid-green"
             disabled={busy() || !qqChecked()}
           >
             {busy()
@@ -323,8 +326,18 @@ export default function Register() {
         ref={helpDialog}
         class="rounded-xl shadow-xl p-6 max-w-100 w-[calc(100%-2rem)]"
       >
-        <h3 class="text-xl font-bold">获取注册码</h3>
-        <p class="my-3">加入赛事群后，向群内 Bot 发起私聊获取注册码。</p>
+        <h3 class="text-xl font-bold">获取注册验证码</h3>
+        <p class="my-3">加入赛事群后，向群内 Bot 私信发送以下指令获取注册验证码。</p>
+        <button
+          type="button"
+          class="mb-3 w-full flex items-center justify-between rounded-md b b-gray-3 bg-gray-1 px-3 py-2 text-left hover:bg-gray-2"
+          aria-label="复制 /注册比赛 指令"
+          title="点击复制"
+          onClick={() => void navigator.clipboard.writeText("/注册比赛")}
+        >
+          <code>/注册比赛</code>
+          <i class="i-mdi-content-copy text-lg text-gray-5" />
+        </button>
         <img
           src={qrCode}
           alt="恋雨杯赛事 QQ 群二维码"
@@ -333,12 +346,12 @@ export default function Register() {
         <a
           class="btn btn-outline-primary w-full mt-4"
           target="_blank"
-          href="https://qm.qq.com/q/svHK8eJulW"
+          href={`https://qm.qq.com/q/2rA92iqmII`}
         >
-          点击加入 QQ 群
+          点击加入赛事QQ群
         </a>
         <button
-          class="btn btn-ghost mt-3 w-full"
+          class="btn btn-outline-primary mt-3 w-full"
           onClick={() => helpDialog.close()}
         >
           关闭
