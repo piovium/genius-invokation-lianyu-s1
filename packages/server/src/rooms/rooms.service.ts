@@ -86,7 +86,6 @@ import {
   clearTournamentRuntimeStatus,
   getTournamentRuntimeStatus,
   markPlayersPlaying,
-  persistedRoundCount,
   setTournamentRuntimeStatus,
 } from "./room-runtime";
 
@@ -692,7 +691,7 @@ class Room {
   }
 
   getRoundCount() {
-    return this.game ? persistedRoundCount(this.game.state) : null;
+    return this.game?.state.roundNumber ?? null;
   }
 
   getRoomInfo(): RoomInfo {

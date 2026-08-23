@@ -8,7 +8,6 @@ import {
   getTournamentRuntimeStatus,
   isPlayerInRunningRoom,
   markPlayersPlaying,
-  persistedRoundCount,
   setTournamentRuntimeStatus,
 } from "./room-runtime";
 
@@ -32,24 +31,5 @@ describe("room runtime registry", () => {
     expect(getTournamentRuntimeStatus(7)).toBe("FINALIZING");
     clearTournamentRuntimeStatus(7);
     expect(getTournamentRuntimeStatus(7)).toBeNull();
-  });
-
-  it("stores the last played round when the core stops at its round limit", () => {
-    expect(
-      persistedRoundCount({
-        phase: "gameEnd",
-        roundNumber: 15,
-        winner: null,
-        config: { maxRoundsCount: 15 },
-      }),
-    ).toBe(14);
-    expect(
-      persistedRoundCount({
-        phase: "gameEnd",
-        roundNumber: 7,
-        winner: 1,
-        config: { maxRoundsCount: 15 },
-      }),
-    ).toBe(7);
   });
 });
