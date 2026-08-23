@@ -269,10 +269,12 @@ export default function EditDeck() {
         </div>
         <Show when={competition()}>
           <div class="alert alert-border-warning mb-3">
-            <i class="i-mdi-lock" />{" "}
-            {fullyLocked()
-              ? "场次进行中：比赛牌组已完全锁定，仅可导出分享码。"
-              : "收集阶段：可调整行动牌和角色顺序，但不可增删角色；更换角色请先取消比赛牌组。"}
+            <p>
+              <i class="i-mdi-lock" />{" "}
+              {fullyLocked()
+                ? "场次进行中：比赛牌组已完全锁定，仅可导出分享码。"
+                : "收集阶段：可调整行动牌和角色顺序，但不可增删角色；更换角色请先取消比赛牌组。"}
+            </p>
           </div>
         </Show>
         <Switch>

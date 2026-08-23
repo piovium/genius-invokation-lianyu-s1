@@ -94,8 +94,10 @@ export default function Statistics() {
           </For>
         </div>
         <div class="alert alert-border-info text-sm">
-          本页按模拟器原始赢家统计，并排除“不计入统计”的对局；出场率分母为
-          2 × 对局数。
+          <p>
+            本页按模拟器原始赢家统计，并排除“不计入统计”的对局；出场率分母为 2 ×
+            对局数。
+          </p>
         </div>
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 my-4">
@@ -123,30 +125,30 @@ export default function Statistics() {
       <Show
         when={tab() !== "users"}
         fallback={
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto table-root">
             <table class="table w-full">
-              <thead>
-                <tr>
-                  <th>用户</th>
-                  <th>对局</th>
-                  <th>胜场</th>
-                  <th>胜率</th>
-                  <th>使用牌组</th>
+              <thead class="table-header">
+                <tr class="table-row">
+                  <th class="table-head">用户</th>
+                  <th class="table-head">对局</th>
+                  <th class="table-head">胜场</th>
+                  <th class="table-head">胜率</th>
+                  <th class="table-head">使用牌组</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody class="table-body">
                 <For each={users()}>
                   {(user) => (
-                    <tr>
-                      <td>
+                    <tr class="table-row">
+                      <td class="table-cell">
                         <b>{user.name}</b>
                         <br />
                         <small>{user.qq}</small>
                       </td>
-                      <td>{user.games}</td>
-                      <td>{user.wins}</td>
-                      <td>{pct(user.winRate)}</td>
-                      <td>
+                      <td class="table-cell">{user.games}</td>
+                      <td class="table-cell">{user.wins}</td>
+                      <td class="table-cell">{pct(user.winRate)}</td>
+                      <td class="table-cell">
                         <details>
                           <summary class="cursor-pointer">
                             {user.decks.length} 套
@@ -179,37 +181,37 @@ export default function Statistics() {
           有效样本 {cards()?.gameCount ?? 0} 局，出场率分母{" "}
           {cards()?.denominator ?? 0}。
         </p>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto table-root">
           <table class="table w-full">
-            <thead>
-              <tr>
-                <th>卡牌 / 组合</th>
-                <th>出场数</th>
-                <th>出场率</th>
-                <th>胜场</th>
-                <th>胜率</th>
+            <thead class="table-header">
+              <tr class="table-row">
+                <th class="table-head">卡牌 / 组合</th>
+                <th class="table-head">出场数</th>
+                <th class="table-head">出场率</th>
+                <th class="table-head">胜场</th>
+                <th class="table-head">胜率</th>
                 <Show when={tab() === "combinations"}>
-                  <th>外战场数</th>
-                  <th>外战胜率</th>
+                  <th class="table-head">外战场数</th>
+                  <th class="table-head">外战胜率</th>
                 </Show>
               </tr>
             </thead>
-            <tbody>
+            <tbody class="table-body">
               <For each={rows()}>
                 {(row) => (
-                  <tr>
-                    <td>
+                  <tr class="table-row">
+                    <td class="table-cell">
                       <b>{name(row.id)}</b>
                       <br />
                       <small>{row.id}</small>
                     </td>
-                    <td>{row.appearances}</td>
-                    <td>{pct(row.appearanceRate)}</td>
-                    <td>{row.wins}</td>
-                    <td>{pct(row.winRate)}</td>
+                    <td class="table-cell">{row.appearances}</td>
+                    <td class="table-cell">{pct(row.appearanceRate)}</td>
+                    <td class="table-cell">{row.wins}</td>
+                    <td class="table-cell">{pct(row.winRate)}</td>
                     <Show when={tab() === "combinations"}>
-                      <td>{row.awayAppearances ?? 0}</td>
-                      <td>{pct(row.awayWinRate ?? 0)}</td>
+                      <td class="table-cell">{row.awayAppearances ?? 0}</td>
+                      <td class="table-cell">{pct(row.awayWinRate ?? 0)}</td>
                     </Show>
                   </tr>
                 )}

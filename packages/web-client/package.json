@@ -19,7 +19,7 @@
     "@solid-primitives/i18n": "^2.2.1",
     "@solid-primitives/storage": "^4.2.1",
     "@solidjs/router": "^0.13.5",
-    "@una-ui/preset": "^0.34.0-beta.1",
+    "@una-ui/preset": "^0.67.9",
     "@unocss/reset": "catalog:",
     "axios": "catalog:",
     "core-js": "3.38.1",
