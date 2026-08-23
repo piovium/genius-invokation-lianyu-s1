@@ -13,10 +13,11 @@ import { TournamentsService } from "./tournaments.service";
 import { RoomsModule } from "../rooms/rooms.module";
 import { DecksModule } from "../decks/decks.module";
 import { RegistrationModule } from "../registration/registration.module";
+import { TournamentRoomRecoveryService } from "./tournament-room-recovery.service";
 
 @Module({
   imports: [DbModule, RoomsModule, DecksModule, RegistrationModule],
-  providers: [TournamentsService, AdminGuard],
+  providers: [TournamentsService, TournamentRoomRecoveryService, AdminGuard],
   controllers: [
     AdminTournamentsController,
     TournamentGamesController,

@@ -80,6 +80,10 @@ export interface RoomDialogProps {
     id: number;
     config: TimeConfig & { [k: string]: any };
   };
+  tournamentGameInfo?: {
+    id: number;
+    decks: (DeckInfoProps & { usable?: boolean })[];
+  };
 }
 
 interface TimeConfig {
@@ -175,7 +179,13 @@ export function RoomDialog(props: RoomDialogProps) {
     setLoadingDecks(true);
     const { type } = status();
     try {
-      if (type === "user") {
+      if (props.tournamentGameInfo) {
+        setAvailableDecks(
+          props.tournamentGameInfo.decks.filter(
+            (deck) => deck.usable !== false,
+          ),
+        );
+      } else if (type === "user") {
         const { data } = await axios.get(`decks?requiredVersion=${version}`);
         setAvailableDecks(data.data);
       } else if (type === "guest") {
@@ -211,7 +221,14 @@ export function RoomDialog(props: RoomDialogProps) {
       let roomId = props.joiningRoomInfo?.id;
       let playerId = id ?? null;
       let response;
-      if (typeof roomId === "undefined") {
+      if (props.tournamentGameInfo) {
+        const { data } = await axios.post(
+          `tournament-games/${props.tournamentGameInfo.id}/join`,
+          { deckId: selectedDeck() },
+        );
+        response = data;
+        roomId = response.room.id as number;
+      } else if (typeof roomId === "undefined") {
         const payload: any = {
           ...timeConfig(),
           private: !isPublic(),
