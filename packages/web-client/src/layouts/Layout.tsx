@@ -19,6 +19,7 @@ import { Footer } from "../components/Footer";
 import { Dynamic } from "solid-js/web";
 
 export interface LayoutProps {
+  pageScroll?: boolean;
   children?: JSX.Element;
 }
 
@@ -30,7 +31,12 @@ export function Layout(props: LayoutProps) {
   return (
     <div class="w-full h-full flex flex-col justify-between">
       <Header />
-      <main class="flex-grow flex-shrink-0 min-h-0 w-full p-4 md:p-8 md:pb-0 mt-12 md:mt-16 md:max-h-[calc(100vh-8.5rem)]">
+      <main
+        class="flex-grow flex-shrink-0 min-h-0 w-full p-4 md:p-8 md:pb-0 mt-12 md:mt-16"
+        classList={{
+          "md:max-h-[calc(100vh-8.5rem)]": !props.pageScroll,
+        }}
+      >
         <Dynamic
           component={import.meta.env.DEV ? Passthrough : ErrorBoundary}
           fallback={(err: Error) => (

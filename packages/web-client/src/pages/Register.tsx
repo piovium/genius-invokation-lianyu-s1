@@ -160,7 +160,7 @@ export default function Register() {
   };
 
   return (
-    <Layout>
+    <Layout pageScroll>
       <div class="mx-auto max-w-125 pb-8">
         <h2 class="text-2xl font-bold mb-5">注册恋雨杯账号</h2>
         <Show when={error()}>

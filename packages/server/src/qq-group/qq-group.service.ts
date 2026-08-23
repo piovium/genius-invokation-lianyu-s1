@@ -57,10 +57,12 @@ export class QqGroupService {
         },
       );
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const members = (await response.json()) as QqMember[];
-      if (!Array.isArray(members)) throw new Error("Invalid member list");
-      this.cache = { expiresAt: now + 60_000, members };
-      return this.findInList(members, qq);
+      const responseObj: any = await response.json();
+      if (!responseObj) throw new Error("Invalid member list");
+      if (responseObj.status !== "ok" || !Array.isArray(responseObj.data))
+        throw new Error(responseObj.message || "Invalid member list");
+      this.cache = { expiresAt: now + 60_000, members: responseObj.data };
+      return this.findInList(responseObj.data, qq);
     } catch (error) {
       throw new BusinessException(
         "QQ_GROUP_SERVICE_UNAVAILABLE",
