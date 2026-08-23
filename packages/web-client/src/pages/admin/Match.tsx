@@ -29,16 +29,29 @@ function DeckAssignment(props: {
   );
   const [selected, setSelected] = createSignal<number | null>(null);
   const [busy, setBusy] = createSignal(false);
-  const assign = async () => {
+  const isCompetitionDeck = (deckId: number) =>
+    props.match.matchDecks.some(
+      (deck) =>
+        deck.userId === props.participant.userId &&
+        deck.sourceDeckId === deckId,
+    );
+  const selectedIsCompetitionDeck = () => {
+    const deckId = selected();
+    return deckId !== null && isCompetitionDeck(deckId);
+  };
+  const updateAssignment = async () => {
     if (selected() === null) return;
-    const reason = prompt("指定比赛牌组的原因");
+    const unassign = selectedIsCompetitionDeck();
+    const reason = prompt(
+      unassign ? "取消指定比赛牌组的原因" : "指定比赛牌组的原因",
+    );
     if (!reason?.trim()) return;
     setBusy(true);
     try {
-      await axios.put(
-        `admin/matches/${props.match.id}/participants/${props.participant.userId}/decks`,
-        { deckId: selected(), reason: reason.trim() },
-      );
+      const url = `admin/matches/${props.match.id}/participants/${props.participant.userId}/decks`;
+      const data = { deckId: selected(), reason: reason.trim() };
+      if (unassign) await axios.delete(url, { data });
+      else await axios.put(url, data);
       props.onDone();
     } catch (e) {
       alert(errorMessage(e));
@@ -68,19 +81,30 @@ function DeckAssignment(props: {
             选择用户牌组
           </option>
           <For each={decks()}>
-            {(deck) => <option value={deck.id}>{deck.name}</option>}
+            {(deck) => (
+              <option value={deck.id}>
+                {isCompetitionDeck(deck.id) ? "【比赛牌组】" : "【其他牌组】"}
+                {deck.name}（
+                {(deck.characterNames ?? deck.characters.map(String)).join("+")}
+                &nbsp;/&nbsp;{deck.id}）
+              </option>
+            )}
           </For>
         </select>
         <button
-          class="btn btn-outline-primary"
+          class={
+            selectedIsCompetitionDeck()
+              ? "btn btn-outline-red"
+              : "btn btn-outline-primary"
+          }
           disabled={
             busy() ||
             selected() === null ||
             props.match.event?.phase === "FINISHED"
           }
-          onClick={assign}
+          onClick={updateAssignment}
         >
-          指定
+          {selectedIsCompetitionDeck() ? "取消指定" : "指定"}
         </button>
       </div>
     </div>

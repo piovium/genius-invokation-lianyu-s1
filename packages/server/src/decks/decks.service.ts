@@ -36,6 +36,7 @@ interface DeckWithVersion extends Deck {
 }
 
 export interface DeckWithDeckModel extends DeckWithVersion, DeckModel {
+  characterNames: string[];
   competition?: unknown;
 }
 
@@ -71,6 +72,10 @@ export class DecksService {
       // code,
       ...deck,
     };
+  }
+
+  private characterNames(characters: readonly number[]): string[] {
+    return characters.map((id) => ASSETS_MANAGER.getNameSync(id) ?? String(id));
   }
 
   private async lockMatch(
@@ -123,6 +128,7 @@ export class DecksService {
         ...model,
         characters,
         cards,
+        characterNames: this.characterNames(characters),
         competition: model.matchDecks[0] ?? null,
       };
     });
@@ -155,6 +161,7 @@ export class DecksService {
       ...model,
       characters,
       cards,
+      characterNames: this.characterNames(characters),
       competition: model.matchDecks[0] ?? null,
     };
   }

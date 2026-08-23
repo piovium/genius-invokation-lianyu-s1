@@ -1133,6 +1133,46 @@ export class TournamentsService {
     });
   }
 
+  async unassignDeck(
+    actorUserId: number,
+    matchId: number,
+    userId: number,
+    deckId: number,
+    reason: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lock(tx, matchId);
+      const match = await tx.tournamentMatch.findUniqueOrThrow({
+        where: { id: matchId },
+        include: { event: true },
+      });
+      if (match.event.phase === "FINISHED")
+        throw new ConflictException("EVENT_PHASE_MISMATCH");
+      const participant = await tx.matchParticipant.findUnique({
+        where: { matchId_userId: { matchId, userId } },
+      });
+      if (!participant) throw new NotFoundException();
+      const current = await tx.matchDeck.findFirst({
+        where: { matchId, userId, sourceDeckId: deckId },
+      });
+      if (!current) throw new NotFoundException();
+      const removed = await tx.matchDeck.delete({
+        where: { id: current.id },
+      });
+      await this.audit(
+        tx,
+        actorUserId,
+        "MATCH_DECK_UNASSIGN",
+        "MatchDeck",
+        current.id,
+        reason,
+        current,
+        undefined,
+      );
+      return removed;
+    });
+  }
+
   activeMatches(userId: number) {
     return this.prisma.tournamentMatch.findMany({
       where: {
