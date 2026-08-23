@@ -5,7 +5,11 @@ import { Layout } from "../../layouts/Layout";
 import { useAuth } from "../../auth";
 
 export function AdminPage(
-  props: ParentProps<{ title: string; actions?: JSX.Element }>,
+  props: ParentProps<{
+    title: JSX.Element;
+    titleActions?: JSX.Element;
+    actions?: JSX.Element;
+  }>,
 ) {
   const auth = useAuth();
   const navigate = useNavigate();
@@ -28,7 +32,10 @@ export function AdminPage(
               <A class="text-sm text-blue-6 hover:underline" href="/admin">
                 赛事管理
               </A>
-              <h2 class="text-2xl font-bold">{props.title}</h2>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-2xl font-bold">{props.title}</h2>
+                {props.titleActions}
+              </div>
             </div>
             {props.actions}
           </div>

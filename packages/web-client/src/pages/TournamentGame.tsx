@@ -90,7 +90,7 @@ export default function TournamentGame() {
           </Match>
           <Match when={options.error}>
             <div class="alert alert-border-error mt-4">
-              {errorMessage(options.error)}
+              <p>{errorMessage(options.error)}</p>
             </div>
           </Match>
           <Match when={options()}>
@@ -152,11 +152,15 @@ export default function TournamentGame() {
                 </div>
                 <Show when={!decks().some((deck) => deck.usable)}>
                   <div class="alert alert-border-warning mt-3">
-                    没有可用牌组，系统不会自动判负。请联系管理员介入处理。
+                    <p>
+                      没有可用牌组，系统不会自动判负。请联系管理员介入处理。
+                    </p>
                   </div>
                 </Show>
                 <Show when={error()}>
-                  <div class="alert alert-border-error mt-4">{error()}</div>
+                  <div class="alert alert-border-error mt-4">
+                    <p>{error()}</p>
+                  </div>
                 </Show>
                 <div class="mt-5 flex justify-end gap-3">
                   <button class="btn btn-ghost" onClick={() => history.back()}>

@@ -165,7 +165,7 @@ export default function Register() {
         <h2 class="text-2xl font-bold mb-5">注册恋雨杯账号</h2>
         <Show when={error()}>
           <div class="alert alert-border-error mb-4" role="alert">
-            {error()}
+            <p>{error()}</p>
           </div>
         </Show>
         <form class="flex flex-col gap-4" onSubmit={submit}>

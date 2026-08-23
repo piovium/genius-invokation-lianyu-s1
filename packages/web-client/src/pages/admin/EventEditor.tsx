@@ -184,6 +184,7 @@ export default function EventEditor() {
               </span>
               <button
                 type="button"
+                class="btn btn-ghost"
                 aria-label="上移"
                 onClick={() =>
                   which === 0
@@ -196,6 +197,7 @@ export default function EventEditor() {
               <button
                 type="button"
                 aria-label="下移"
+                class="btn btn-ghost"
                 onClick={() =>
                   which === 0
                     ? setSide0(move(side0(), index(), 1))
@@ -206,7 +208,7 @@ export default function EventEditor() {
               </button>
               <button
                 type="button"
-                class="text-red-6"
+                class="btn btn-ghost-red"
                 aria-label="移除"
                 onClick={() => remove(which, id)}
               >
@@ -397,20 +399,20 @@ export default function EventEditor() {
               加入玩家 1
             </button>
           </div>
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto table-root">
             <table class="table w-full">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>选手</th>
-                  <th>排名</th>
-                  <th>盘数 / 胜盘</th>
-                  <th>小分</th>
-                  <th>小小分</th>
-                  <th>操作</th>
+              <thead class="table-header">
+                <tr class="table-row">
+                  <th class="table-head"></th>
+                  <th class="table-head">选手</th>
+                  <th class="table-head">排名</th>
+                  <th class="table-head">盘数 / 胜盘</th>
+                  <th class="table-head">小分</th>
+                  <th class="table-head">小小分</th>
+                  <th class="table-head">操作</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody class="table-body">
                 <For each={candidates()}>
                   {(candidate) => {
                     const ranking = () =>
@@ -420,12 +422,12 @@ export default function EventEditor() {
                       side1().includes(candidate.id);
                     return (
                       <tr
-                        class="data-[conflict=true]:bg-red-50"
+                        class="table-row data-[conflict=true]:bg-red-50"
                         data-conflict={
                           checked().includes(candidate.id) && occupied()
                         }
                       >
-                        <td>
+                        <td class="table-cell">
                           <input
                             type="checkbox"
                             disabled={occupied()}
@@ -441,18 +443,19 @@ export default function EventEditor() {
                             }
                           />
                         </td>
-                        <td>
+                        <td class="table-cell">
                           <b>{candidate.name}</b>
                           <br />
                           <small>{candidate.qq}</small>
                         </td>
-                        <td>{ranking()?.rank ?? "—"}</td>
-                        <td>
+                        <td class="table-cell">{ranking()?.rank ?? "—"}</td>
+                        <td class="table-cell">
                           {ranking()
                             ? `${ranking()!.played} / ${ranking()!.won}`
                             : "—"}
                         </td>
                         <td
+                          class="table-cell"
                           title={
                             ranking()
                               ? `${ranking()!.tieBreak.numerator}/${ranking()!.tieBreak.denominator}`
@@ -464,6 +467,7 @@ export default function EventEditor() {
                             : "—"}
                         </td>
                         <td
+                          class="table-cell"
                           title={
                             ranking()
                               ? `${ranking()!.secondTieBreak.numerator}/${ranking()!.secondTieBreak.denominator}`
@@ -474,22 +478,22 @@ export default function EventEditor() {
                             ? ranking()!.secondTieBreak.value.toFixed(3)
                             : "—"}
                         </td>
-                        <td>
+                        <td class="table-cell">
                           <button
                             type="button"
-                            class="text-blue-6 mr-2"
+                            class="btn btn-ghost-blue"
                             disabled={occupied()}
                             onClick={() => add(0, [candidate.id])}
                           >
-                            →0
+                            add to 0
                           </button>
                           <button
                             type="button"
-                            class="text-blue-6"
+                            class="btn btn-ghost-blue"
                             disabled={occupied()}
                             onClick={() => add(1, [candidate.id])}
                           >
-                            →1
+                            add to 1
                           </button>
                         </td>
                       </tr>
@@ -501,10 +505,12 @@ export default function EventEditor() {
           </div>
         </section>
         <Show when={error()}>
-          <div class="alert alert-border-error">{error()}</div>
+          <div class="alert alert-border-error">
+            <p>{error()}</p>
+          </div>
         </Show>
         <div class="flex justify-end">
-          <button class="btn btn-solid-primary" disabled={busy()}>
+          <button class="btn btn-solid-success" disabled={busy()}>
             {busy() ? "正在创建…" : "确认并创建场次"}
           </button>
         </div>
