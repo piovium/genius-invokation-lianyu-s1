@@ -1,9 +1,17 @@
 import { A, useParams } from "@solidjs/router";
 import axios from "axios";
-import { For, Show, createResource, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createResource,
+  createSignal,
+} from "solid-js";
 import type { TournamentEvent } from "../../api/models";
 import { errorMessage } from "../../api/errors";
 import { AdminPage, fmt, modeLabel, phaseLabel } from "./shared";
+import { M } from "../../../../core/dist/index-BMbzMSPC";
 
 export default function AdminEvent() {
   const params = useParams();
@@ -28,7 +36,7 @@ export default function AdminEvent() {
       )
     )
       return;
-    const reason = prompt("请输入操作原因（审计必填）");
+    const reason = prompt("请输入操作原因");
     if (!reason?.trim()) return;
     setBusy(true);
     setMessage("");
@@ -53,7 +61,7 @@ export default function AdminEvent() {
       current.phase === "DECK_COLLECTION"
         ? Number(prompt("牌组上限（0 不限）", String(current.deckLimit)))
         : undefined;
-    const reason = prompt("修改原因（审计必填）");
+    const reason = prompt("修改原因");
     if (!reason?.trim()) return;
     try {
       await axios.patch(`admin/events/${current.id}`, {
@@ -103,7 +111,13 @@ export default function AdminEvent() {
             disabled={busy() || event()?.phase === "FINISHED"}
             onClick={advance}
           >
-            步进阶段
+            <Switch>
+              <Match when={event()?.phase === "DECK_COLLECTION"}>
+                开始场次
+              </Match>
+              <Match when={event()?.phase === "RUNNING"}>结束场次</Match>
+              <Match when={true}>步进</Match>
+            </Switch>
           </button>
         </div>
       }
