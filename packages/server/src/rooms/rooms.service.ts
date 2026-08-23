@@ -118,6 +118,25 @@ interface CreateRoomConfig extends RoomConfig {
 interface TournamentRoomReservation {
   gameId: number;
   expectedUserIds: readonly [number, number];
+  expectedPlayers: readonly [RoomPlayerSummary, RoomPlayerSummary];
+}
+
+interface TournamentGameJoinInput extends TournamentRoomReservation {
+  userId: number;
+  who: 0 | 1;
+  playerName: string;
+  avatarUrl?: string;
+  deckId: number | null;
+  deck: Deck;
+  roomConfig: Partial<CreateRoomDto>;
+  ensurePending: () => Promise<unknown>;
+  markStarted: () => Promise<unknown>;
+  finalize: (result: {
+    winnerWho: number | null;
+    roundCount: number | null;
+    endReason: "NORMAL" | "ENGINE_ERROR" | "SURRENDER";
+    stateLog: unknown;
+  }) => Promise<unknown>;
 }
 
 interface PlayerIOWithError extends PlayerIO {
@@ -141,6 +160,11 @@ type PlayerInfo = (
   deckId: number | null;
   avatarUrl?: string;
 };
+
+type RoomPlayerSummary = Pick<
+  PlayerInfo,
+  "isGuest" | "id" | "name" | "avatarUrl"
+>;
 
 export type PlayerId = PlayerInfo["id"];
 
@@ -450,6 +474,8 @@ interface RoomInfo {
   status: RoomStatus;
   watchable: boolean;
   players: PlayerInfo[];
+  tournamentGameId: number | null;
+  tournamentPlayers: readonly RoomPlayerSummary[] | null;
 }
 
 function sendDebugLog(name: string, message: any) {
@@ -555,6 +581,11 @@ class Room {
     }
     this.participant = player;
     return flip(this.hostWho);
+  }
+  setPlayer(who: 0 | 1, player: Player) {
+    return who === this.hostWho
+      ? this.setHost(player)
+      : this.setParticipant(player);
   }
   start() {
     if (this.terminated) {
@@ -701,6 +732,8 @@ class Room {
       status: this.status,
       watchable: this.config.watchable,
       players: this.getPlayers().map((player) => player.playerInfo),
+      tournamentGameId: this.getTournamentGameId(),
+      tournamentPlayers: this.tournament?.expectedPlayers ?? null,
     };
   }
 }
@@ -721,6 +754,7 @@ export class RoomsService {
   private roomIdPool = toShuffled(Array.from({ length: 10000 }, (_, i) => i));
   private rooms = new Map<number, Room>();
   private tournamentRooms = new Map<number, number>();
+  private tournamentRoomLifecycles = new Set<number>();
   private tournamentRoomLocks = new Map<number, Promise<void>>();
   private playerRoomLocks = new Map<PlayerId, Promise<void>>();
   private shutdownResolvers: PromiseWithResolvers<void> | null = null;
@@ -885,7 +919,7 @@ export class RoomsService {
   }
 
   private async createRoom(
-    playerInfo: PlayerInfo,
+    playerInfo: PlayerInfo | null,
     params: CreateRoomDto,
     tournament: TournamentRoomReservation | null = null,
   ) {
@@ -918,18 +952,22 @@ export class RoomsService {
       allowGuest: params.allowGuest ?? true,
     };
 
-    try {
-      const version = await verifyDeck(playerInfo.deck);
-      if (semver.compare(version, roomConfig.gameVersion) > 0) {
-        throw new BadRequestException(
-          `Deck version required ${version}, it's higher game version ${roomConfig.gameVersion}`,
-        );
-      }
-    } catch (e) {
-      if (e instanceof DeckVerificationError) {
-        throw new BadRequestException(`Deck verification failed: ${e.message}`);
-      } else {
-        throw e;
+    if (playerInfo) {
+      try {
+        const version = await verifyDeck(playerInfo.deck);
+        if (semver.compare(version, roomConfig.gameVersion) > 0) {
+          throw new BadRequestException(
+            `Deck version required ${version}, it's higher game version ${roomConfig.gameVersion}`,
+          );
+        }
+      } catch (e) {
+        if (e instanceof DeckVerificationError) {
+          throw new BadRequestException(
+            `Deck verification failed: ${e.message}`,
+          );
+        } else {
+          throw e;
+        }
       }
     }
 
@@ -941,13 +979,22 @@ export class RoomsService {
     this.rooms.set(roomId, room);
     this.roomIdPool.shift();
     this.metrics.incrementCreatedRooms();
-    this.logger.log(`Room ${room.id} created, host is ${playerInfo.name}`);
+    this.logger.log(
+      playerInfo
+        ? `Room ${room.id} created, host is ${playerInfo.name}`
+        : `Room ${room.id} reserved for tournament game ${tournament?.gameId}`,
+    );
 
     room.onStop(async (room, game) => {
       if (room.getTournamentGameId() === null) {
         clearPlayingPlayers(
           room.getPlayers().map((player) => player.playerInfo.id),
         );
+      } else if (!game) {
+        const gameId = room.getTournamentGameId()!;
+        this.tournamentRooms.delete(gameId);
+        this.tournamentRoomLifecycles.delete(gameId);
+        clearTournamentRuntimeStatus(gameId);
       }
       if (game) {
         this.metrics.incrementFinishedRooms();
@@ -974,16 +1021,20 @@ export class RoomsService {
       }
     });
 
-    room.setHost(new Player(playerInfo));
-    // 闲置五分钟后删除房间
-    setTimeout(
-      () => {
-        if (room.status === RoomStatus.Waiting) {
-          room.stop();
-        }
-      },
-      5 * 60 * 1000,
-    );
+    if (playerInfo) {
+      room.setHost(new Player(playerInfo));
+    }
+    if (!tournament) {
+      // 闲置五分钟后删除普通房间；赛事预留房间由对局生命周期管理。
+      setTimeout(
+        () => {
+          if (room.status === RoomStatus.Waiting) {
+            room.stop();
+          }
+        },
+        5 * 60 * 1000,
+      );
+    }
     return room.getRoomInfo();
   }
 
@@ -1104,7 +1155,8 @@ export class RoomsService {
       ...room.getPlayers().map((player) => player.playerInfo.id),
       playerInfo.id,
     ];
-    if (beforeStart) {
+    const willStart = room.getPlayers().length === 1;
+    if (beforeStart && willStart) {
       markPlayersPlaying(startingPlayerIds);
       if (reservedGameId !== null) {
         setTournamentRuntimeStatus(reservedGameId, "PLAYING");
@@ -1125,7 +1177,12 @@ export class RoomsService {
     }
     let joinedWho: 0 | 1;
     try {
-      joinedWho = room.setParticipant(new Player(playerInfo));
+      const player = new Player(playerInfo);
+      const tournamentWho = room.expectedTournamentWho(playerInfo.id as number);
+      joinedWho =
+        reservedGameId !== null && tournamentWho !== null
+          ? room.setPlayer(tournamentWho, player)
+          : room.setParticipant(player);
     } catch (error) {
       clearPlayingPlayers(startingPlayerIds);
       if (reservedGameId !== null) {
@@ -1138,6 +1195,12 @@ export class RoomsService {
       joinedWho !== room.expectedTournamentWho(playerInfo.id as number)
     ) {
       throw new UnauthorizedException("Tournament seat mismatch");
+    }
+    if (room.getPlayers().length < 2) {
+      if (reservedGameId !== null) {
+        setTournamentRuntimeStatus(reservedGameId, "WAITING");
+      }
+      return;
     }
     // Add to game database when room stopped
     if (persistCasual) {
@@ -1189,7 +1252,7 @@ export class RoomsService {
         room.setTournamentFinalizePromise(persistence);
       });
     }
-    if (!beforeStart) {
+    if (!beforeStart || !willStart) {
       markPlayersPlaying(
         room.getPlayers().map((player) => player.playerInfo.id),
       );
@@ -1219,68 +1282,112 @@ export class RoomsService {
     this.metrics.incrementStartedRooms();
   }
 
-  async joinTournamentGame(input: {
-    gameId: number;
-    userId: number;
-    who: 0 | 1;
-    playerName: string;
-    avatarUrl?: string;
-    deckId: number | null;
-    deck: Deck;
-    expectedUserIds: readonly [number, number];
-    roomConfig: Partial<CreateRoomDto>;
-    ensurePending: () => Promise<unknown>;
-    markStarted: () => Promise<unknown>;
-    finalize: (result: {
-      winnerWho: number | null;
-      roundCount: number | null;
-      endReason: "NORMAL" | "ENGINE_ERROR" | "SURRENDER";
-      stateLog: unknown;
-    }) => Promise<unknown>;
-  }) {
+  async reserveTournamentGame(
+    input: TournamentRoomReservation & {
+      roomConfig: Partial<CreateRoomDto>;
+    },
+  ) {
+    return this.withTournamentRoomLock(input.gameId, async () => {
+      const existingRoomId = this.tournamentRooms.get(input.gameId);
+      if (existingRoomId !== undefined) {
+        const existingRoom = this.rooms.get(existingRoomId);
+        if (existingRoom && existingRoom.status !== RoomStatus.Finished) {
+          return existingRoom.getRoomInfo();
+        }
+        this.tournamentRooms.delete(input.gameId);
+      }
+      const roomInfo = await this.createRoom(
+        null,
+        {
+          ...input.roomConfig,
+          hostFirst: true,
+          allowGuest: false,
+          private: true,
+        },
+        {
+          gameId: input.gameId,
+          expectedUserIds: input.expectedUserIds,
+          expectedPlayers: input.expectedPlayers,
+        },
+      );
+      this.tournamentRooms.set(input.gameId, roomInfo.id);
+      setTournamentRuntimeStatus(input.gameId, "WAITING");
+      return roomInfo;
+    });
+  }
+
+  private attachTournamentRoomLifecycle(
+    room: Room,
+    input: TournamentGameJoinInput,
+  ) {
+    if (this.tournamentRoomLifecycles.has(input.gameId)) return;
+    this.tournamentRoomLifecycles.add(input.gameId);
+    room.onStop((finishedRoom, game) => {
+      const playerIds = finishedRoom
+        .getPlayers()
+        .map((player) => player.playerInfo.id);
+      if (!game) {
+        clearPlayingPlayers(playerIds);
+        return;
+      }
+      if (!finishedRoom.shouldFinalizeTournament()) {
+        setTournamentRuntimeStatus(input.gameId, "FINALIZING");
+        return;
+      }
+      setTournamentRuntimeStatus(input.gameId, "FINALIZING");
+      const persistence = this.finalizeTournamentGame(
+        input.gameId,
+        playerIds,
+        () =>
+          input.finalize({
+            winnerWho: game.state.winner,
+            roundCount: finishedRoom.getRoundCount(),
+            endReason: finishedRoom.getEndReason(),
+            stateLog: finishedRoom.getStateLog(),
+          }),
+      );
+      finishedRoom.setTournamentFinalizePromise(persistence);
+    });
+  }
+
+  async joinTournamentGame(input: TournamentGameJoinInput) {
     return this.withTournamentRoomLock(input.gameId, () =>
       this.withPlayerRoomLock(input.userId, async () => {
         await input.ensurePending();
-        const existingRoomId = this.tournamentRooms.get(input.gameId);
-        if (existingRoomId !== undefined) {
-          const room = this.rooms.get(existingRoomId);
-          if (!room) {
-            this.tournamentRooms.delete(input.gameId);
-          } else {
-            if (room.status === RoomStatus.Finished) {
-              throw new ConflictException("TOURNAMENT_GAME_FINALIZING");
-            }
-            if (
-              room
-                .getPlayers()
-                .some((player) => player.playerInfo.id === input.userId)
-            ) {
-              return { room: room.getRoomInfo(), gameId: input.gameId };
-            }
-            const playerInfo: PlayerInfo = {
-              isGuest: false,
-              id: input.userId,
-              name: input.playerName,
-              deck: input.deck,
-              deckId: input.deckId,
-              avatarUrl: input.avatarUrl,
-            };
-            await this.joinRoom(
-              playerInfo,
-              existingRoomId,
-              false,
-              input.gameId,
-              input.markStarted,
-            );
-            return { room: room.getRoomInfo(), gameId: input.gameId };
+        let roomId = this.tournamentRooms.get(input.gameId);
+        let room = typeof roomId === "number" ? this.rooms.get(roomId) : null;
+        if (!room || room.status === RoomStatus.Finished) {
+          if (room?.status === RoomStatus.Finished) {
+            throw new ConflictException("TOURNAMENT_GAME_FINALIZING");
           }
-        }
-
-        if (this.currentRoom(input.userId)) {
-          throw new ConflictException(
-            `User ${input.userId} is already in a room`,
+          this.tournamentRooms.delete(input.gameId);
+          const roomInfo = await this.createRoom(
+            null,
+            {
+              ...input.roomConfig,
+              hostFirst: true,
+              allowGuest: false,
+              private: true,
+            },
+            {
+              gameId: input.gameId,
+              expectedUserIds: input.expectedUserIds,
+              expectedPlayers: input.expectedPlayers,
+            },
           );
+          roomId = roomInfo.id;
+          room = this.rooms.get(roomId)!;
+          this.tournamentRooms.set(input.gameId, roomId);
+          setTournamentRuntimeStatus(input.gameId, "WAITING");
         }
+        if (
+          room
+            .getPlayers()
+            .some((player) => player.playerInfo.id === input.userId)
+        ) {
+          return { room: room.getRoomInfo(), gameId: input.gameId };
+        }
+        this.attachTournamentRoomLifecycle(room, input);
         const playerInfo: PlayerInfo = {
           isGuest: false,
           id: input.userId,
@@ -1289,48 +1396,14 @@ export class RoomsService {
           deckId: input.deckId,
           avatarUrl: input.avatarUrl,
         };
-        const roomInfo = await this.createRoom(
+        await this.joinRoom(
           playerInfo,
-          {
-            ...input.roomConfig,
-            hostFirst: input.who === 0,
-            allowGuest: false,
-            private: true,
-          },
-          { gameId: input.gameId, expectedUserIds: input.expectedUserIds },
+          room.id,
+          false,
+          input.gameId,
+          input.markStarted,
         );
-        const room = this.rooms.get(roomInfo.id)!;
-        this.tournamentRooms.set(input.gameId, room.id);
-        setTournamentRuntimeStatus(input.gameId, "WAITING");
-        room.onStop((finishedRoom, game) => {
-          const playerIds = finishedRoom
-            .getPlayers()
-            .map((player) => player.playerInfo.id);
-          if (!game) {
-            clearPlayingPlayers(playerIds);
-            this.tournamentRooms.delete(input.gameId);
-            clearTournamentRuntimeStatus(input.gameId);
-            return;
-          }
-          if (!finishedRoom.shouldFinalizeTournament()) {
-            setTournamentRuntimeStatus(input.gameId, "FINALIZING");
-            return;
-          }
-          setTournamentRuntimeStatus(input.gameId, "FINALIZING");
-          const persistence = this.finalizeTournamentGame(
-            input.gameId,
-            playerIds,
-            () =>
-              input.finalize({
-                winnerWho: game.state.winner,
-                roundCount: finishedRoom.getRoundCount(),
-                endReason: finishedRoom.getEndReason(),
-                stateLog: finishedRoom.getStateLog(),
-              }),
-          );
-          finishedRoom.setTournamentFinalizePromise(persistence);
-        });
-        return { room: roomInfo, gameId: input.gameId };
+        return { room: room.getRoomInfo(), gameId: input.gameId };
       }),
     );
   }
@@ -1346,6 +1419,7 @@ export class RoomsService {
         await finalizeGame();
         clearPlayingPlayers(playerIds);
         this.tournamentRooms.delete(gameId);
+        this.tournamentRoomLifecycles.delete(gameId);
         clearTournamentRuntimeStatus(gameId);
         return;
       } catch (error) {

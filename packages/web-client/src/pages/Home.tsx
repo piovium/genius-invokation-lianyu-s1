@@ -102,6 +102,11 @@ export default function Home() {
     const roomId = roomCodeToId(roomCode);
     try {
       const { data } = await axios.get(`rooms/${roomId}`);
+      if (data.tournamentGameId) {
+        alert("赛事房间只能从“我的比赛”进入");
+        setJoiningRoomInfo();
+        return;
+      }
       setJoiningRoomInfo(data);
       joinRoomDialogEl.showModal();
     } catch (e) {
@@ -113,6 +118,10 @@ export default function Home() {
     }
   };
   const joinRoomByInfo = (roomInfo: RoomInfo) => {
+    if (roomInfo.tournamentGameId) {
+      alert("赛事房间只能从“我的比赛”进入");
+      return;
+    }
     if (!decks().count) {
       alert(t("createDeckFirst"));
       navigate("/decks/new");
