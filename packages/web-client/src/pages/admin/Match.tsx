@@ -357,6 +357,7 @@ export default function AdminMatch() {
                     <th>先后手 / 牌组</th>
                     <th>原始 / 裁定赢家</th>
                     <th>结束原因</th>
+                    <th>回合数</th>
                     <th>计入统计</th>
                     <th>操作</th>
                   </tr>
@@ -395,6 +396,7 @@ export default function AdminMatch() {
                           {game.manualWinnerWho ?? "—"}
                         </td>
                         <td>{game.endReason ?? "—"}</td>
+                        <td>{game.roundCount ?? "—"}</td>
                         <td>{game.countForStats ? "是" : "否"}</td>
                         <td>
                           <button
