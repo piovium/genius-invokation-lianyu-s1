@@ -88,6 +88,7 @@ import {
   markPlayersPlaying,
   setTournamentRuntimeStatus,
 } from "./room-runtime";
+import { serializeRoomStateLogPlayers } from "./room-state-log";
 
 const s3 = process.env.S3_ENDPOINT
   ? new S3Client({
@@ -697,10 +698,10 @@ class Room {
   }
 
   getStateLog() {
-    const players = ([0, 1] as const).map((who) => {
-      const player = this.getPlayer(who)?.playerInfo;
-      return player && { who, id: player.id, name: player.name };
-    });
+    const players = serializeRoomStateLogPlayers([
+      this.getPlayer(0)?.playerInfo ?? null,
+      this.getPlayer(1)?.playerInfo ?? null,
+    ]);
     return {
       ...serializeGameStateLog(this.stateLog),
       gv: this.config.gameVersion,
