@@ -10,6 +10,7 @@ import {
   markPlayersPlaying,
   setTournamentRuntimeStatus,
 } from "./room-runtime";
+import { serializeRoomStateLogPlayers } from "./room-state-log";
 
 describe("room runtime registry", () => {
   it("tracks and clears playing users", () => {
@@ -31,5 +32,23 @@ describe("room runtime registry", () => {
     expect(getTournamentRuntimeStatus(7)).toBe("FINALIZING");
     clearTournamentRuntimeStatus(7);
     expect(getTournamentRuntimeStatus(7)).toBeNull();
+  });
+});
+
+describe("room state log", () => {
+  it("serializes empty player seats as null", () => {
+    expect(serializeRoomStateLogPlayers([null, null])).toEqual([null, null]);
+  });
+
+  it("preserves player seat indexes", () => {
+    expect(
+      serializeRoomStateLogPlayers([
+        { id: 101, name: "A" },
+        { id: 102, name: "B" },
+      ]),
+    ).toEqual([
+      { who: 0, id: 101, name: "A" },
+      { who: 1, id: 102, name: "B" },
+    ]);
   });
 });
