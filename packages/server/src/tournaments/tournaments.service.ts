@@ -684,6 +684,7 @@ export class TournamentsService {
   async finalizeGame(input: {
     gameId: number;
     winnerWho: number | null;
+    roundCount: number | null;
     endReason: GameEndReason;
     stateLog: unknown;
     countForStats?: boolean;
@@ -701,7 +702,10 @@ export class TournamentsService {
       if (game.status === "FINISHED" && game.endReason === "ADMIN") {
         return tx.game.update({
           where: { id: game.id },
-          data: { stateLog: json(input.stateLog) },
+          data: {
+            stateLog: json(input.stateLog),
+            roundCount: input.roundCount,
+          },
         });
       }
       const updated = await tx.game.update({
@@ -709,6 +713,7 @@ export class TournamentsService {
         data: {
           status: "FINISHED",
           winnerWho: input.winnerWho,
+          roundCount: input.roundCount,
           endReason: input.endReason,
           stateLog: json(input.stateLog),
           countForStats:
@@ -905,6 +910,7 @@ export class TournamentsService {
           manualWinnerWho: dto.manualWinnerWho,
           countForStats: dto.countForStats,
           endReason: dto.status === "FINISHED" ? "ADMIN" : null,
+          roundCount: dto.status === "PENDING" ? null : undefined,
           finishedAt: dto.status === "FINISHED" ? new Date() : null,
         },
       });
@@ -922,10 +928,14 @@ export class TournamentsService {
     });
   }
 
-  async attachAdminStateLog(gameId: number, stateLog: unknown) {
+  async attachAdminStateLog(
+    gameId: number,
+    stateLog: unknown,
+    roundCount: number | null,
+  ) {
     return this.prisma.game.updateMany({
       where: { id: gameId, endReason: "ADMIN" },
-      data: { stateLog: json(stateLog) },
+      data: { stateLog: json(stateLog), roundCount },
     });
   }
 
@@ -1027,7 +1037,10 @@ export class TournamentsService {
     };
   }
 
-  registrationSettings(dto?: RegistrationSettingsDto) {
+  async registrationSettings(
+    dto?: RegistrationSettingsDto,
+    actorUserId?: number,
+  ) {
     if (!dto) {
       return this.prisma.registrationSetting.upsert({
         where: { id: 1 },
@@ -1035,17 +1048,40 @@ export class TournamentsService {
         update: {},
       });
     }
-    return this.prisma.registrationSetting.upsert({
-      where: { id: 1 },
-      create: {
-        id: 1,
-        cutoffAt: dto.cutoffAt ? new Date(dto.cutoffAt) : null,
-        limit: dto.limit,
-      },
-      update: {
-        cutoffAt: dto.cutoffAt ? new Date(dto.cutoffAt) : null,
-        limit: dto.limit,
-      },
+    const opensAt = dto.opensAt ? new Date(dto.opensAt) : null;
+    const cutoffAt = dto.cutoffAt ? new Date(dto.cutoffAt) : null;
+    if (opensAt && cutoffAt && opensAt.getTime() >= cutoffAt.getTime()) {
+      throw new BusinessException(
+        "INVALID_REGISTRATION_WINDOW",
+        "报名开始时间必须早于报名截止时间",
+        400,
+      );
+    }
+    if (actorUserId === undefined) {
+      throw new Error("Actor is required to update registration settings");
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(22004, 1)`;
+      const before = await tx.registrationSetting.upsert({
+        where: { id: 1 },
+        create: { id: 1 },
+        update: {},
+      });
+      const after = await tx.registrationSetting.update({
+        where: { id: 1 },
+        data: { opensAt, cutoffAt, limit: dto.limit },
+      });
+      await this.audit(
+        tx,
+        actorUserId,
+        "REGISTRATION_SETTINGS_UPDATE",
+        "RegistrationSetting",
+        1,
+        dto.reason,
+        before,
+        after,
+      );
+      return after;
     });
   }
 

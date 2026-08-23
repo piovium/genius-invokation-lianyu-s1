@@ -118,6 +118,7 @@ model AuthChallenge {
 
 model RegistrationSetting {
   id        Int       @id @default(1)
+  opensAt   DateTime?
   cutoffAt  DateTime?
   limit     Int       @default(0)
   updatedAt DateTime  @updatedAt
@@ -217,6 +218,7 @@ model MatchDeck {
 
 model Game {
   id              Int              @id @default(autoincrement())
+  persistenceKey  String?          @unique
   matchId         Int?
   match           TournamentMatch? @relation(fields: [matchId], references: [id], onDelete: SetNull)
   status          GameStatus       @default(PENDING)
@@ -227,6 +229,7 @@ model Game {
   manualWinnerWho Int?
   endReason       GameEndReason?
   countForStats   Boolean          @default(true)
+  roundCount      Int?
   players         GamePlayer[]
   startedAt       DateTime?
   finishedAt      DateTime?

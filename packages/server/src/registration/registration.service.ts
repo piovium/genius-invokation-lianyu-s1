@@ -6,6 +6,10 @@ import { PrismaService } from "../db/prisma.service";
 import { QqGroupService } from "../qq-group/qq-group.service";
 import { BusinessException } from "../errors";
 import { isPlayerInRunningRoom } from "../rooms/room-runtime";
+import {
+  assertRegistrationOpen,
+  registrationWindowState,
+} from "./registration-window";
 
 @Injectable()
 export class RegistrationService {
@@ -23,9 +27,8 @@ export class RegistrationService {
     const registeredCount = await this.prisma.user.count({
       where: { competitionStatus: { not: "NONE" } },
     });
-    const isOpen =
-      !settings.cutoffAt || settings.cutoffAt.getTime() > Date.now();
-    return { ...settings, registeredCount, isOpen };
+    const state = registrationWindowState(settings);
+    return { ...settings, registeredCount, state, isOpen: state === "OPEN" };
   }
 
   async apply(userId: number, verifyMembership = true) {
@@ -43,9 +46,7 @@ export class RegistrationService {
         create: { id: 1 },
         update: {},
       });
-      if (settings.cutoffAt && settings.cutoffAt.getTime() <= Date.now()) {
-        throw new BusinessException("REGISTRATION_CLOSED", "报名已经截止", 409);
-      }
+      assertRegistrationOpen(settings);
       const updated =
         current.competitionStatus === "NONE"
           ? await tx.user.update({

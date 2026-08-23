@@ -1,12 +1,18 @@
 import axios from "axios";
-import { Show, createResource, createSignal } from "solid-js";
+import {
+  Show,
+  createEffect,
+  createResource,
+  createSignal,
+  onCleanup,
+} from "solid-js";
 import { useAuth, type UserInfo } from "../auth";
 import type { RegistrationSettings } from "../api/models";
 import { errorMessage } from "../api/errors";
 
 export function RegistrationBanner() {
   const auth = useAuth();
-  const [settings] = createResource(() =>
+  const [settings, { refetch }] = createResource(() =>
     axios
       .get<RegistrationSettings>("registration/settings")
       .then((r) => r.data),
@@ -16,6 +22,35 @@ export function RegistrationBanner() {
   const user = (): UserInfo | null => {
     const current = auth.status();
     return current.type === "user" ? current : null;
+  };
+  createEffect(() => {
+    const current = settings();
+    if (!current) return;
+    const now = Date.now();
+    const nextBoundary = [current.opensAt, current.cutoffAt]
+      .filter((value): value is string => !!value)
+      .map((value) => new Date(value).getTime())
+      .filter((value) => value > now)
+      .sort((a, b) => a - b)[0];
+    if (nextBoundary === undefined) return;
+    const timer = window.setTimeout(
+      () => void refetch(),
+      Math.min(nextBoundary - now + 50, 2_147_483_647),
+    );
+    onCleanup(() => window.clearTimeout(timer));
+  });
+  const registrationMessage = () => {
+    const current = settings();
+    if (!current || current.isOpen !== false) {
+      return "报名开放中，无需填写额外资料。";
+    }
+    if (current.state === "NOT_STARTED" && current.opensAt) {
+      return `报名将于 ${new Date(current.opensAt).toLocaleString()} 开始`;
+    }
+    if (current.cutoffAt) {
+      return `报名已于 ${new Date(current.cutoffAt).toLocaleString()} 截止`;
+    }
+    return "当前不在报名时间内。";
   };
 
   const apply = async () => {
@@ -71,11 +106,7 @@ export function RegistrationBanner() {
           <div>
             <div class="font-bold text-lg">恋雨杯 S1</div>
             <Show when={current().competitionStatus === "NONE"}>
-              <p>
-                {settings()?.isOpen === false
-                  ? `报名已于 ${new Date(settings()!.cutoffAt!).toLocaleString()} 截止`
-                  : "报名开放中，无需填写额外资料。"}
-              </p>
+              <p>{registrationMessage()}</p>
             </Show>
             <Show when={current().competitionStatus === "REGISTERED"}>
               <p>
