@@ -27,6 +27,76 @@ const transactionClient = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("TournamentsService running match administration", () => {
+  it("disables automatic game creation for bye matches", async () => {
+    const createMatch = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 7 })
+      .mockResolvedValueOnce({ id: 8 });
+    const createdEvent = {
+      id: 3,
+      name: "Test event",
+      phase: "DECK_COLLECTION",
+      deckLimit: 0,
+    };
+    const result = { ...createdEvent, matches: [] };
+    const tx = transactionClient({
+      user: {
+        findMany: vi.fn().mockResolvedValue(
+          [101, 102, 201].map((id) => ({
+            id,
+            competitionStatus: "PLAYER",
+            activeMatchId: null,
+          })),
+        ),
+        update: vi.fn(),
+      },
+      tournamentEvent: {
+        create: vi.fn().mockResolvedValue(createdEvent),
+        findUniqueOrThrow: vi.fn().mockResolvedValue(result),
+      },
+      tournamentMatch: { create: createMatch },
+    });
+    const prisma = {
+      $transaction: vi.fn(async (operation) => operation(tx)),
+    };
+    const service = new TournamentsService(prisma as never);
+
+    await expect(
+      service.createEvent(11, {
+        event: {
+          name: "Test event",
+          initialPhase: "DECK_COLLECTION",
+          deckLimit: 0,
+        },
+        matchTemplate: {
+          mode: "UNRESTRICTED",
+          maxGames: 3,
+          winsRequired: 2,
+          autoCreateGame: true,
+          roomConfig: {},
+        },
+        player0Ids: [101, 102],
+        player1Ids: [201],
+      }),
+    ).resolves.toBe(result);
+
+    expect(createMatch).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({ autoCreateGame: true }),
+      }),
+    );
+    expect(createMatch).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          autoCreateGame: false,
+          participants: { create: [{ userId: 102, who: 0 }] },
+        }),
+      }),
+    );
+  });
+
   it("updates match configuration while running and audits before and after", async () => {
     const before = {
       id: 7,
