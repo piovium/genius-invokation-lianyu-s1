@@ -79,10 +79,10 @@ export function Footer() {
       <div>
         <a
           class="text-blue-400"
-          href={t("playerGroupLink")}
+          href={`https://qm.qq.com/q/2rA92iqmII`}
           target="_blank"
         >
-          {t("joinPlayerGroup")}
+          {`点击加入赛事QQ群（1016833703）`}
         </a>
       </div>
     </footer>
