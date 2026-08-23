@@ -35,7 +35,6 @@ const Room = lazy(() => import("./pages/Room"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const LoginPage = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
-const TournamentGame = lazy(() => import("./pages/TournamentGame"));
 const AdminHome = lazy(() => import("./pages/admin/Home"));
 const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const AdminEvents = lazy(() => import("./pages/admin/Events"));
@@ -87,7 +86,6 @@ function App() {
             <Route path="/user/:id" component={User} />
             <Route path="/decks/:id" component={EditDeck} />
             <Route path="/decks" component={Decks} />
-            <Route path="/competition/games/:id" component={TournamentGame} />
             <Route path="/rooms/:code" component={Room} />
             <Route path="/admin" component={AdminHome} />
             <Route path="/admin/users" component={AdminUsers} />

@@ -167,7 +167,7 @@ export class TournamentsService {
         for (const matchId of matchIds)
           await this.createNextGameTx(tx, matchId, true);
       }
-      return tx.tournamentEvent.findUnique({
+      return tx.tournamentEvent.findUniqueOrThrow({
         where: { id: event.id },
         include: {
           matches: {
@@ -250,6 +250,7 @@ export class TournamentsService {
         throw new ConflictException("EVENT_PHASE_MISMATCH");
       const next = event.phase === "DECK_COLLECTION" ? "RUNNING" : "FINISHED";
       let closedGameIds: number[] = [];
+      const createdGameIds: number[] = [];
       if (next === "RUNNING") {
         const selectedDecks = await tx.matchDeck.findMany({
           where: { match: { eventId: id } },
@@ -279,8 +280,10 @@ export class TournamentsService {
           data: { phase: next },
         });
         for (const match of event.matches) {
-          if (match.autoCreateGame)
-            await this.createNextGameTx(tx, match.id, true);
+          if (match.autoCreateGame) {
+            const game = await this.createNextGameTx(tx, match.id, true);
+            if (game) createdGameIds.push(game.id);
+          }
         }
       } else {
         closedGameIds = (
@@ -321,7 +324,7 @@ export class TournamentsService {
         { phase: event.phase },
         { phase: next },
       );
-      return { id, phase: next, closedGameIds };
+      return { id, phase: next, closedGameIds, createdGameIds };
     });
   }
 
@@ -607,6 +610,119 @@ export class TournamentsService {
     });
   }
 
+  async tournamentRoomReservation(gameId: number) {
+    const game = await this.prisma.game.findUniqueOrThrow({
+      where: { id: gameId },
+      include: {
+        match: true,
+        players: {
+          include: { user: { select: { name: true, qq: true } } },
+          orderBy: { who: "asc" },
+        },
+      },
+    });
+    if (!game.match || game.status !== "PENDING") {
+      throw new ConflictException("MATCH_COMPLETED");
+    }
+    if (
+      game.players.length !== 2 ||
+      game.players.some((player) => player.userId === null)
+    ) {
+      throw new ConflictException("MATCH_REQUIRES_TWO_PLAYERS");
+    }
+    return {
+      gameId,
+      expectedUserIds: game.players.map((player) => player.userId) as [
+        number,
+        number,
+      ],
+      expectedPlayers: game.players.map((player) => ({
+        isGuest: false as const,
+        id: player.userId!,
+        name: player.user!.name,
+        avatarUrl: `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(player.user!.qq)}&s=640`,
+      })) as [
+        {
+          isGuest: false;
+          id: number;
+          name: string;
+          avatarUrl: string;
+        },
+        {
+          isGuest: false;
+          id: number;
+          name: string;
+          avatarUrl: string;
+        },
+      ],
+      roomConfig: game.match.roomConfig as Record<string, unknown>,
+    };
+  }
+
+  async pendingTournamentRoomReservations() {
+    await this.prisma.game.updateMany({
+      where: {
+        status: "PENDING",
+        matchId: { not: null },
+        match: { event: { phase: "RUNNING" } },
+      },
+      data: { startedAt: null },
+    });
+    const games = await this.prisma.game.findMany({
+      where: {
+        status: "PENDING",
+        matchId: { not: null },
+        match: { event: { phase: "RUNNING" } },
+      },
+      include: {
+        match: true,
+        players: {
+          include: { user: { select: { name: true, qq: true } } },
+          orderBy: { who: "asc" },
+        },
+      },
+      orderBy: { id: "asc" },
+    });
+    return games.flatMap((game) => {
+      if (
+        !game.match ||
+        game.players.length !== 2 ||
+        game.players.some((player) => player.userId === null)
+      ) {
+        return [];
+      }
+      return [
+        {
+          gameId: game.id,
+          expectedUserIds: game.players.map((player) => player.userId) as [
+            number,
+            number,
+          ],
+          expectedPlayers: game.players.map((player) => ({
+            isGuest: false as const,
+            id: player.userId!,
+            name: player.user!.name,
+            avatarUrl: `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(player.user!.qq)}&s=640`,
+          })) as [
+            {
+              isGuest: false;
+              id: number;
+              name: string;
+              avatarUrl: string;
+            },
+            {
+              isGuest: false;
+              id: number;
+              name: string;
+              avatarUrl: string;
+            },
+          ],
+          roomConfig: game.match.roomConfig as Record<string, unknown>,
+        },
+      ];
+    });
+  }
+
   async tournamentRoomData(gameId: number, userId: number) {
     const game = await this.prisma.game.findUniqueOrThrow({
       where: { id: gameId },
@@ -650,6 +766,25 @@ export class TournamentsService {
       expectedUserIds: game.players.map((item) => item.userId) as [
         number,
         number,
+      ],
+      expectedPlayers: game.players.map((item) => ({
+        isGuest: false as const,
+        id: item.userId!,
+        name: item.user!.name,
+        avatarUrl: `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(item.user!.qq)}&s=640`,
+      })) as [
+        {
+          isGuest: false;
+          id: number;
+          name: string;
+          avatarUrl: string;
+        },
+        {
+          isGuest: false;
+          id: number;
+          name: string;
+          avatarUrl: string;
+        },
       ],
       roomConfig: game.match.roomConfig as Record<string, unknown>,
     };
@@ -700,13 +835,14 @@ export class TournamentsService {
         include: { players: true, match: true },
       });
       if (game.status === "FINISHED" && game.endReason === "ADMIN") {
-        return tx.game.update({
+        const updated = await tx.game.update({
           where: { id: game.id },
           data: {
             stateLog: json(input.stateLog),
             roundCount: input.roundCount,
           },
         });
+        return { game: updated, nextGameId: null };
       }
       const updated = await tx.game.update({
         where: { id: game.id },
@@ -724,8 +860,8 @@ export class TournamentsService {
       if (input.endReason !== "ENGINE_ERROR") {
         await this.exhaustDecks(tx, game, input.winnerWho);
       }
-      await this.settleMatch(tx, existing.matchId!);
-      return updated;
+      const nextGame = await this.settleMatch(tx, existing.matchId!);
+      return { game: updated, nextGameId: nextGame?.id ?? null };
     });
   }
 
@@ -785,18 +921,19 @@ export class TournamentsService {
         where: { id: matchId },
         data: { winnerUserId: winner, autoCreateGame: false },
       });
-      return;
+      return null;
     }
     if (match.games.length >= match.maxGames) {
       await tx.tournamentMatch.update({
         where: { id: matchId },
         data: { autoCreateGame: false },
       });
-      return;
+      return null;
     }
     if (match.games.length < match.maxGames && match.autoCreateGame) {
-      await this.createNextGameTx(tx, matchId, true);
+      return this.createNextGameTx(tx, matchId, true);
     }
+    return null;
   }
 
   async autoWin(actorUserId: number, matchId: number, reason?: string) {
