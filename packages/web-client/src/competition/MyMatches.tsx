@@ -58,7 +58,7 @@ export function MyMatches() {
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
           <For
             each={matches()}
-            fallback={<p class="text-gray-5">暂无活跃比赛。</p>}
+            fallback={<p class="text-gray-5">暂无比赛</p>}
           >
             {(match) => {
               const opponent = () =>
