@@ -2,12 +2,10 @@ import {
   ParentProps,
   createMemo,
   createContext,
-  createSignal,
   useContext,
 } from "solid-js";
 import type { AssetsManager } from "@gi-tcg/assets-manager";
 import { I18nDictionary } from "./locales";
-import { makePersisted } from "@solid-primitives/storage";
 import zhCN from "./locales/zh-CN";
 import en from "./locales/en";
 import {
@@ -28,7 +26,6 @@ export type Translator = SolidTranslator<I18nDictionary>;
 
 interface I18nContextValue {
   locale: () => Locale;
-  setLocale: (locale: Locale) => void;
   assetsManager: () => AssetsManager;
   t: Translator;
 }
@@ -36,15 +33,12 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue>();
 
 export function I18nProvider(props: ParentProps) {
-  const [locale, setLocale] = makePersisted(createSignal<Locale>("zh-CN"), {
-    name: "locale",
-  });
+  const locale = () => "zh-CN" as const;
   const dict = createMemo(() => translations[locale()]);
   const t = translator(dict, resolveTemplate);
 
   const value: I18nContextValue = {
     locale,
-    setLocale,
     assetsManager: () => ASSETS_MANAGER,
     t,
   };
