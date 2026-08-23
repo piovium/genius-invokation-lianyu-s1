@@ -180,7 +180,11 @@ export class GameInterventionDto extends ReasonDto {
   countForStats!: boolean;
 }
 
-export class RegistrationSettingsDto {
+export class RegistrationSettingsDto extends ReasonDto {
+  @IsISO8601()
+  @IsOptional()
+  opensAt!: string | null;
+
   @IsISO8601()
   @IsOptional()
   cutoffAt!: string | null;
@@ -226,8 +230,8 @@ export class AdminTournamentsController {
   }
 
   @Patch("registration/settings")
-  updateSettings(@Body() dto: RegistrationSettingsDto) {
-    return this.tournaments.registrationSettings(dto);
+  updateSettings(@User() actor: number, @Body() dto: RegistrationSettingsDto) {
+    return this.tournaments.registrationSettings(dto, actor);
   }
 
   @Get("users")
@@ -259,10 +263,13 @@ export class AdminTournamentsController {
       for (const item of result.results) {
         if (item.ok && "closedGameIds" in item) {
           for (const gameId of item.closedGameIds) {
-            const stateLog = this.rooms.terminateTournamentGame(gameId, true);
-            if (stateLog) {
-              await this.tournaments.attachAdminStateLog(gameId, stateLog);
-            }
+            await this.rooms.finalizeAdminTournamentGame(gameId, (snapshot) =>
+              this.tournaments.attachAdminStateLog(
+                gameId,
+                snapshot.stateLog,
+                snapshot.roundCount,
+              ),
+            );
           }
           this.rooms.terminateWaitingTournamentRoomsForUser(item.userId);
         }
@@ -304,10 +311,13 @@ export class AdminTournamentsController {
     const result = await this.tournaments.advanceEvent(actor, id, reason);
     if (result.phase === "FINISHED") {
       for (const gameId of result.closedGameIds) {
-        const stateLog = this.rooms.terminateTournamentGame(gameId, true);
-        if (stateLog) {
-          await this.tournaments.attachAdminStateLog(gameId, stateLog);
-        }
+        await this.rooms.finalizeAdminTournamentGame(gameId, (snapshot) =>
+          this.tournaments.attachAdminStateLog(
+            gameId,
+            snapshot.stateLog,
+            snapshot.roundCount,
+          ),
+        );
       }
     }
     return result;
@@ -388,10 +398,15 @@ export class AdminTournamentsController {
     @Param("id", ParseIntPipe) id: number,
     @Body() dto: GameInterventionDto,
   ) {
-    const result = await this.tournaments.interveneGame(actor, id, dto);
-    const stateLog = this.rooms.terminateTournamentGame(id, true);
-    if (stateLog) await this.tournaments.attachAdminStateLog(id, stateLog);
-    return result;
+    const updated = await this.tournaments.interveneGame(actor, id, dto);
+    await this.rooms.finalizeAdminTournamentGame(id, (snapshot) =>
+      this.tournaments.attachAdminStateLog(
+        id,
+        snapshot.stateLog,
+        snapshot.roundCount,
+      ),
+    );
+    return updated;
   }
 
   @Get("audit-logs")
@@ -449,10 +464,13 @@ export class ParticipantTournamentsController {
   async withdraw(@User() userId: number) {
     const result = await this.registration.withdraw(userId);
     for (const gameId of result.closedGameIds) {
-      const stateLog = this.rooms.terminateTournamentGame(gameId, true);
-      if (stateLog) {
-        await this.tournaments.attachAdminStateLog(gameId, stateLog);
-      }
+      await this.rooms.finalizeAdminTournamentGame(gameId, (snapshot) =>
+        this.tournaments.attachAdminStateLog(
+          gameId,
+          snapshot.stateLog,
+          snapshot.roundCount,
+        ),
+      );
     }
     this.rooms.terminateWaitingTournamentRoomsForUser(userId);
     return result;

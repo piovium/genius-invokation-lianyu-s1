@@ -6,10 +6,12 @@ export type CompetitionStatus = "NONE" | "REGISTERED" | "PLAYER";
 export type GameStatus = "PENDING" | "FINISHED";
 
 export interface RegistrationSettings {
+  opensAt: string | null;
   cutoffAt: string | null;
   limit: number;
   registeredCount?: number;
   isOpen?: boolean;
+  state?: "NOT_STARTED" | "OPEN" | "CLOSED";
 }
 
 export interface Participant {
@@ -40,6 +42,7 @@ export interface TournamentGame {
   winnerWho: number | null;
   manualWinnerWho: number | null;
   countForStats: boolean;
+  roundCount: number | null;
   endReason: string | null;
   stateLog?: unknown;
   createdAt: string;

@@ -146,7 +146,7 @@ MatchDeckDisableReason DUEL_USED | CONQUEST_WINNER_USED | ADMIN
 
 #### `RegistrationSettings`
 
-单行配置（固定 `id=1`）：`deadline`、`limit`、`updatedByUserId`、`updatedAt`。部署前必须 seed；`limit=0` 表示不限额。
+单行配置（固定 `id=1`）：`opensAt`、`cutoffAt`、`limit`、`updatedAt`。`opensAt/cutoffAt` 可空；两者均存在时必须满足 `opensAt < cutoffAt`。`limit=0` 表示不限额。
 
 ### 5.3 牌组
 
@@ -229,6 +229,7 @@ OR finishedGameCount >= maxGames
 | `winnerWho`                   | 原始赢家 `0/1/null`，统计唯一使用该字段 |
 | `manualWinnerWho`             | 管理员指定 `0/1/null`                   |
 | `countForStats`               | 默认 true；引擎错误自动 false           |
+| `roundCount`                  | 终局回合数；未实际开局时为空            |
 | `stateLog`                    | JSON，可空；赛事导出不包含              |
 | `createdAt/startedAt/endedAt` | 时间信息                                |
 
@@ -245,7 +246,7 @@ OR finishedGameCount >= maxGames
 至少审计以下操作：
 
 - 管理员批量更改报名/参赛状态、取消报名、强制退赛；
-- 修改报名截止时间和限额；
+- 修改报名开始时间、截止时间和限额；
 - 创建、修改和步进场次；
 - 自动胜利、手动创建对局、修改对局/盘次赢家或状态；
 - 修改 `countForStats`；
@@ -336,7 +337,7 @@ stateDiagram-v2
 
 规则：
 
-- 报名时检查 `now < deadline`，等于截止时间视为关闭；
+- 报名时检查 `opensAt <= now < cutoffAt`；未配置的一端视为无界，等于截止时间视为关闭；
 - 再次实时检查 QQ 群成员身份；
 - `queuePosition` 为所有 `REGISTERED/PLAYER` 用户按 `appliedAt,id` 的稳定序号；`limit=0` 时永不候补，否则 `queuePosition > limit` 为候补；
 - 候补只影响提示，不阻止管理员设为 `PLAYER`；
@@ -462,7 +463,7 @@ Room 额外保存 `tournamentGameId` 和结束原因。服务重启后内存 Roo
 
 - 两个 `GamePlayer`，游客 `userId/deckId=null`；
 - 两副完整牌组 JSON 和显示名；
-- core/config 版本、原始赢家、结束原因、统计开关和 State Log。
+- core/config 版本、原始赢家、结束原因、终局回合数、统计开关和 State Log。
 
 只有房间从未真正开始时不入库。模拟器错误也入库，但 `endReason=ENGINE_ERROR` 且 `countForStats=false`。S3 上传继续作为可选备份，数据库写入失败必须记录高优先级日志并上报运行指标，不能被 S3 成功掩盖。
 
@@ -553,7 +554,7 @@ Room 额外保存 `tournamentGameId` 和结束原因。服务重启后内存 Roo
 
 | 方法与路径                               | 权限        | 用途                               |
 | ---------------------------------------- | ----------- | ---------------------------------- |
-| `GET /registration/settings`             | Public      | 截止时间、限额、报名数、是否开放   |
+| `GET /registration/settings`             | Public      | 开始/截止时间、限额、报名数、状态  |
 | `POST /auth/registration/qq-check`       | Public      | 群成员检查和昵称预填               |
 | `POST /auth/register/password`           | Public      | 密码注册，可同时报名               |
 | `POST /auth/register/passkey/options`    | Public      | Passkey 注册 options               |
@@ -578,7 +579,7 @@ Room 额外保存 `tournamentGameId` 和结束原因。服务重启后内存 Roo
 
 | 方法与路径                                          | 用途                             |
 | --------------------------------------------------- | -------------------------------- |
-| `GET/PATCH /admin/registration/settings`            | 查看/修改报名设置                |
+| `GET/PATCH /admin/registration/settings`            | 查看/修改报名窗口和限额          |
 | `GET /admin/users`                                  | 按状态筛选、按报名时间排序       |
 | `PATCH /admin/users/competition-status`             | 批量设置报名或参赛状态           |
 | `POST /admin/rankings/preview`                      | 多场次排名预览                   |
@@ -727,4 +728,4 @@ JWT_SECRET
 7. 完成业务统计接口，保留并回归 Prometheus `/metrics`。
 8. 与 web-client 联调，执行并发集成测试后再发布新库。
 
-发布前必须确认 WebAuthn 正式域名/RP ID、管理员 QQ 列表、报名截止时间和限额已经配置。由于使用新数据库，不编写旧 GitHub 用户和旧 Game 表的数据迁移脚本。
+发布前必须确认 WebAuthn 正式域名/RP ID、管理员 QQ 列表、报名开始/截止时间和限额已经配置。由于使用新数据库，不编写旧 GitHub 用户和旧 Game 表的数据迁移脚本。
