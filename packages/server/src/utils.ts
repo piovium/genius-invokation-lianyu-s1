@@ -16,6 +16,7 @@
 import type { Deck } from "@gi-tcg/typings";
 import {
   AssetsManager,
+  DEFAULT_ASSETS_API_ENDPOINT,
   DEFAULT_ASSETS_MANAGER,
   type ActionCardRawData,
   type AnyData,
@@ -87,6 +88,7 @@ const [gameData, amOptions] = customDataLoader.done();
 
 export const ASSETS_MANAGER_OPTIONS: Partial<AssetsManagerOption> = {
   ...amOptions,
+  apiEndpoint: DEFAULT_ASSETS_API_ENDPOINT,
   language: "CHS",
   overrideData: [...(amOptions.overrideData ?? []), ...MATCH_CONFIG.overrides],
   version: versionResolver.versionMap,
