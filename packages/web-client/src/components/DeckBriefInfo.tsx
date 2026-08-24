@@ -14,13 +14,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import { useNavigate } from "@solidjs/router";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { createResource, For, Show } from "solid-js";
 import { DeckInfo } from "../pages/Decks";
 import { useGuestDecks } from "../guest";
 import { useAuth } from "../auth";
 import { copyShareCode } from "../utils";
 import { useI18n } from "../i18n";
+import { errorMessage } from "../api/errors";
 
 export interface DeckInfoProps extends DeckInfo {
   variant?: "normal" | "selected" | "disabled";
@@ -83,9 +84,7 @@ export function DeckBriefInfo(props: DeckInfoProps) {
         }
         props.onDelete?.();
       } catch (e) {
-        if (e instanceof AxiosError) {
-          alert(e.response?.data.message);
-        }
+        alert(errorMessage(e));
         console.error(e);
       }
     }

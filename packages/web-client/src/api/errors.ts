@@ -22,7 +22,17 @@ const messages: Record<string, string> = {
   NO_USABLE_COMPETITION_DECK: "该牌组不可用于本局",
   USER_ALREADY_IN_ACTIVE_EVENT: "部分选手已在其他活跃场次中",
   MATCH_ALREADY_HAS_OPEN_GAME: "该盘已有开放对局",
+  COMPETITION_DECK_SOURCE_MISSING: "比赛牌组对应的原始牌组不存在",
+  MATCH_COMPLETED: "该盘比赛已结束",
+  MATCH_REQUIRES_TWO_PLAYERS: "该盘需要两名选手",
+  TOURNAMENT_DECK_NOT_SELECTED: "尚未选择比赛牌组",
+  MATCH_NOT_A_BYE: "该盘不是轮空场次",
+  TOURNAMENT_GAME_FINALIZING: "对局正在结算中",
 };
+
+function translateMessage(message: string): string {
+  return messages[message] ?? message;
+}
 
 export function apiProblem(error: unknown): ApiProblem | null {
   if (!(error instanceof AxiosError)) return null;
@@ -33,7 +43,13 @@ export function apiProblem(error: unknown): ApiProblem | null {
 export function errorMessage(error: unknown): string {
   const problem = apiProblem(error);
   if (problem?.code && messages[problem.code]) return messages[problem.code]!;
-  if (Array.isArray(problem?.message)) return problem.message.join("；");
-  if (typeof problem?.message === "string") return problem.message;
-  return error instanceof Error ? error.message : String(error);
+  if (Array.isArray(problem?.message)) {
+    return problem.message.map(translateMessage).join("；");
+  }
+  if (typeof problem?.message === "string") {
+    return translateMessage(problem.message);
+  }
+  return error instanceof Error
+    ? translateMessage(error.message)
+    : translateMessage(String(error));
 }

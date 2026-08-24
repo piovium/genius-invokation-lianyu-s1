@@ -15,8 +15,8 @@
 
 import { createSignal, For, Show } from "solid-js";
 import { useAuth } from "../auth";
-import { AxiosError } from "axios";
 import { useI18n } from "../i18n";
+import { errorMessage } from "../api/errors";
 
 export const CHESSBOARD_COLORS = [
   "#c0cac3",
@@ -97,9 +97,7 @@ export function ChessboardColor(props: ChessboardColorProps) {
               await updateInfo({ chessboardColor: color() });
               setDirty(false);
             } catch (e) {
-              if (e instanceof AxiosError) {
-                alert(e.response?.data.message);
-              }
+              alert(errorMessage(e));
               console.error(e);
             } finally {
               setLoading(false);

@@ -25,7 +25,7 @@ import {
 } from "solid-js";
 import { Layout } from "../layouts/Layout";
 import { A, useNavigate } from "@solidjs/router";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { DeckBriefInfo } from "../components/DeckBriefInfo";
 import { RoomDialog } from "../components/RoomDialog";
 import { roomCodeToId } from "../utils";
@@ -37,6 +37,7 @@ import { useI18n } from "../i18n";
 import { Portal } from "solid-js/web";
 import { RegistrationBanner } from "../competition/RegistrationBanner";
 import { MyMatches } from "../competition/MyMatches";
+import { errorMessage } from "../api/errors";
 
 export default function Home() {
   const { t } = useI18n();
@@ -110,9 +111,7 @@ export default function Home() {
       setJoiningRoomInfo(data);
       joinRoomDialogEl.showModal();
     } catch (e) {
-      if (e instanceof AxiosError) {
-        alert(e.response?.data.message);
-      }
+      alert(errorMessage(e));
       console.error(e);
       setJoiningRoomInfo();
     }
@@ -283,10 +282,7 @@ export default function Home() {
                       <Match when={allRooms.error}>
                         <div class="text-red-500">
                           {t("roomInfoLoadFailed", {
-                            message:
-                              allRooms.error instanceof AxiosError
-                                ? allRooms.error.response?.data.message
-                                : allRooms.error,
+                              message: errorMessage(allRooms.error),
                           })}
                         </div>
                       </Match>
