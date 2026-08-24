@@ -22,7 +22,7 @@ import {
   createEffect,
 } from "solid-js";
 import { Layout } from "../layouts/Layout";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import type { Deck } from "@gi-tcg/typings";
 import { staticDecode, staticEncode } from "@gi-tcg/assets-manager";
 import { useParams, useSearchParams } from "@solidjs/router";
@@ -165,10 +165,8 @@ export default function EditDeck() {
         setDeckName(newName);
         return true;
       } catch (e) {
-        if (e instanceof AxiosError) {
-          alert(e.response?.data.message);
-          setDeckName(oldName);
-        }
+        alert(errorMessage(e));
+        setDeckName(oldName);
         console.error(e);
       }
       return false;
@@ -282,9 +280,7 @@ export default function EditDeck() {
           <Match when={status().type !== "guest" && userDeckData.error}>
             {t("loadFailed", {
               message:
-                userDeckData.error instanceof AxiosError
-                  ? userDeckData.error.response?.data.message
-                  : userDeckData.error,
+                errorMessage(userDeckData.error),
             })}
           </Match>
           <Match when={status().type !== "notLogin"}>
