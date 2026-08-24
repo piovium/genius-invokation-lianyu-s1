@@ -24,14 +24,20 @@ import { useI18n } from "../i18n";
 
 dayjs.extend(localize);
 
-export function Footer() {
+export function Footer(props: { mobileOnly?: boolean }) {
   const { versionInfo } = useVersionContext();
   const { t, locale } = useI18n();
   onMount(() => {
     dayjs.locale(locale().toLocaleLowerCase());
   });
   return (
-    <footer class="flex flex-col md:flex-row gap-x-4 gap-y-0 p-4 text-sm text-gray-500 flex-wrap">
+    <footer
+      class="flex-col gap-x-4 gap-y-0 p-4 text-sm text-gray-500 flex-wrap"
+      classList={{
+        "hidden md:flex md:flex-row": !props.mobileOnly,
+        "mt-auto flex w-full md:hidden": props.mobileOnly,
+      }}
+    >
       <div class="flex flex-row gap-4">
         <span>© 2026 Piovium Labs</span>
         <a

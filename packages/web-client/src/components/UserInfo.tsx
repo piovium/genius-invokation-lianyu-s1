@@ -14,7 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import { createResource, For, Match, Show, Switch } from "solid-js";
-import { A } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import axios from "axios";
 import { GameInfo } from "./GameInfo";
 import { ChessboardColor } from "./ChessboardColor";
@@ -24,6 +24,7 @@ import { AvatarSelector } from "./AvatarSelector";
 import { useAuth } from "../auth";
 import { TextFieldEdit } from "./TextFieldEdit";
 import { errorMessage } from "../api/errors";
+import { Footer } from "./Footer";
 
 export interface UserInfoProps {
   type: "user" | "guest";
@@ -36,6 +37,7 @@ export interface UserInfoProps {
 
 export function UserInfo(props: UserInfoProps) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [games] = createResource(() =>
     axios.get<{ data: any[] }>(`games/mine`).then((res) => res.data),
   );
@@ -43,7 +45,11 @@ export function UserInfo(props: UserInfoProps) {
   let avatarSelectorEl: HTMLDialogElement | undefined;
 
   // Nickname editing state
-  const { updateInfo } = useAuth();
+  const { status, updateInfo, logout } = useAuth();
+  const isAdmin = () => {
+    const current = status();
+    return current.type === "user" && current.role === "ADMIN";
+  };
 
   const saveName = async (newName: string) => {
     if (newName.trim()) {
@@ -150,11 +156,29 @@ export function UserInfo(props: UserInfoProps) {
             </dd>
           </div>
           <hr class="h-1 w-full text-gray-4 my-4" />
-          <div class="flex items-center gap-3">
+          {/* <div class="flex items-center gap-3">
             <A class="btn btn-ghost font-bold" href="/decks">
               {t("myDecksMore")}
             </A>
+          </div> */}
+          <div class="mt-4 w-full flex flex-col gap-2 md:hidden">
+            <Show when={isAdmin()}>
+              <A class="btn btn-outline-purple w-full" href="/admin">
+                赛事管理
+              </A>
+            </Show>
+            <button
+              class="btn btn-outline-red w-full"
+              onClick={async () => {
+                await logout();
+                navigate("/");
+              }}
+            >
+              <i class="i-mdi-logout" />
+              {t("logout")}
+            </button>
           </div>
+          <Footer mobileOnly />
         </Show>
       </div>
     </div>

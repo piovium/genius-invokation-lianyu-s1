@@ -385,7 +385,7 @@ export function RoomDialog(props: RoomDialogProps) {
                   />
                 </div>
               </Show>
-              <Show when={editable() ? allowGuest() : guestInfo()}>
+              {/* <Show when={editable() ? allowGuest() : guestInfo()}>
                 <div class="mb-3 alert alert-border-warning">
                   <p class="alert-description break-all">
                     {t("guestRecordWarning", {
@@ -396,7 +396,7 @@ export function RoomDialog(props: RoomDialogProps) {
                     })}
                   </p>
                 </div>
-              </Show>
+              </Show> */}
             </Show>
           </div>
           <div class="b-r-gray-200 b-1" />
