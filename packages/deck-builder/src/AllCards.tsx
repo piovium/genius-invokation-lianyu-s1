@@ -43,20 +43,20 @@ export function AllCards(props: AllCardsProps) {
     >
       <div class="flex flex-row mb-2">
         <button
-          class="data-[active]:font-bold rounded-l-full w-22 h-8 b-1 b-r-0 data-[active]:b-0 data-[active]:bg-blue-100"
+          class="data-[active]:font-bold rounded-l-full w-50% h-8 b-1 b-r-0 data-[active]:b-0 data-[active]:bg-blue-100"
           onClick={() => setTab(0)}
           bool:data-active={tab() === 0}
         >
           {t("characters")}
         </button>
         <button
-          class="data-[active]:font-bold rounded-r-full w-22 h-8 b-1 b-l-0 data-[active]:b-0 data-[active]:bg-blue-100"
+          class="data-[active]:font-bold rounded-r-full w-50% h-8 b-1 b-l-0 data-[active]:b-0 data-[active]:bg-blue-100"
           onClick={() => setTab(1)}
           bool:data-active={tab() === 1}
         >
           {t("actionCards")}
         </button>
-        <Show
+        {/* <Show
           when={!props.versionSpecified}
           fallback={
             <span class="text-gray-500 ml-2">
@@ -77,7 +77,7 @@ export function AllCards(props: AllCardsProps) {
               )}
             </Index>
           </select>
-        </Show>
+        </Show> */}
       </div>
       <div class="min-h-0">
         <div

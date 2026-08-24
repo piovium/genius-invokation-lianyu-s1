@@ -28,6 +28,7 @@ import axios from "axios";
 import { AuthProvider } from "./auth";
 
 const Home = lazy(() => import("./pages/Home"));
+const Competition = lazy(() => import("./pages/Competition"));
 const User = lazy(() => import("./pages/User"));
 const Decks = lazy(() => import("./pages/Decks"));
 const EditDeck = lazy(() => import("./pages/EditDeck"));
@@ -81,6 +82,7 @@ function App() {
         <AuthProvider>
           <Router base={import.meta.env.BASE_URL.replace(/(.+)\/$/, "$1")}>
             <Route path="/" component={Home} />
+            <Route path="/competition" component={Competition} />
             <Route path="/login" component={LoginPage} />
             <Route path="/register" component={Register} />
             <Route path="/user/:id" component={User} />
