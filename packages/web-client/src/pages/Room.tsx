@@ -39,6 +39,7 @@ import { MobileChessboardLayout } from "../layouts/MobileChessboardLayout";
 import type { CancellablePlayerIO } from "@gi-tcg/core";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
+import { errorMessage } from "../api/errors";
 
 interface InitializedPayload {
   who: 0 | 1;
@@ -192,6 +193,7 @@ export default function Room() {
         try {
           message = JSON.parse(value ?? "{}").message;
         } catch {}
+        message = errorMessage(message);
         if (initialized()) {
           alert(message);
         } else {
@@ -211,9 +213,7 @@ export default function Room() {
           `rooms/${id}/players/${playerId}/giveUp`,
         );
       } catch (e) {
-        if (e instanceof AxiosError) {
-          alert(e.response?.data.message);
-        }
+        alert(errorMessage(e));
         console.error(e);
       }
     };
@@ -251,9 +251,7 @@ export default function Room() {
       );
       await reply;
     } catch (e) {
-      if (e instanceof AxiosError) {
-        alert(e.response?.data.message);
-      }
+      alert(errorMessage(e));
       console.error(e);
     }
   };
@@ -266,9 +264,7 @@ export default function Room() {
       const { data } = await axios.delete(`rooms/${id}`);
       history.back();
     } catch (e) {
-      if (e instanceof AxiosError) {
-        alert(e.response?.data.message);
-      }
+      alert(errorMessage(e));
       console.error(e);
     }
   };
@@ -350,7 +346,7 @@ export default function Room() {
           break;
         }
         case "error": {
-          alert(t("fatalError", { message: payload.message }));
+          alert(t("fatalError", { message: errorMessage(payload.message) }));
           break;
         }
         default: {
@@ -430,9 +426,7 @@ export default function Room() {
       URL.revokeObjectURL(url);
       a.remove();
     } catch (e) {
-      if (e instanceof AxiosError) {
-        alert(e.response?.data.message);
-      }
+      alert(errorMessage(e));
       console.error(e);
     }
   };
