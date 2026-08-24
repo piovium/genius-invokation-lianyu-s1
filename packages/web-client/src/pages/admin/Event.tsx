@@ -289,11 +289,11 @@ export default function AdminEvent() {
               onSubmit={rename}
             >
               <h3 class="text-xl font-bold">重命名场次</h3>
-              <label class="flex flex-col gap-1 mt-3">
-                <span>场次名称</span>
+              <label class="flex flex-col md:flex-row md:items-center gap-1 mt-3">
+                <span class="shrink-0">场次名称</span>
                 <input
                   name="name"
-                  class="input input-solid"
+                  class="input input-solid h-10 flex-1"
                   value={data().name}
                   maxlength={100}
                   autofocus
@@ -330,15 +330,15 @@ export default function AdminEvent() {
               onSubmit={editDeckLimit}
             >
               <h3 class="text-xl font-bold">修改牌组上限</h3>
-              <label class="flex flex-col gap-1 mt-3">
-                <span>牌组上限（0 不限）</span>
+              <label class="flex flex-col md:flex-row md:items-center gap-1 mt-3">
+                <span class="shrink-0">牌组上限（0 不限）</span>
                 <input
                   name="deckLimit"
                   type="number"
                   min="0"
                   max="100"
                   step="1"
-                  class="input input-solid"
+                  class="input input-solid h-10 flex-1"
                   value={data().deckLimit}
                   autofocus
                   required

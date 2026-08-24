@@ -9,7 +9,7 @@ import type {
   TournamentEvent,
 } from "../../api/models";
 import { errorMessage, apiProblem } from "../../api/errors";
-import { AdminPage } from "./shared";
+import { AdminPage, RoomConfigFields, roomConfigFromForm } from "./shared";
 
 function move(ids: number[], index: number, offset: number) {
   const next = [...ids];
@@ -108,7 +108,6 @@ export default function EventEditor() {
     setBusy(true);
     setError("");
     try {
-      const roomConfigText = String(form.get("roomConfig") || "{}");
       const { data } = await axios.post<{ id: number }>("admin/events", {
         event: {
           name: String(form.get("name")),
@@ -126,7 +125,7 @@ export default function EventEditor() {
           maxGames,
           winsRequired,
           autoCreateGame: form.get("autoCreateGame") === "on",
-          roomConfig: JSON.parse(roomConfigText),
+          roomConfig: roomConfigFromForm(form),
         },
         player0Ids: side0(),
         player1Ids: side1(),
@@ -229,101 +228,97 @@ export default function EventEditor() {
     >
       <form class="flex flex-col gap-5" onSubmit={submit}>
         <section class="rounded-xl b b-gray-2 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <label class="flex flex-col gap-1 sm:col-span-2">
-            <span>场次名称</span>
+          <label class="flex flex-col md:flex-row md:items-center gap-1 sm:col-span-2">
+            <span class="shrink-0">场次名称</span>
             <input
               name="name"
-              class="input input-solid"
+              class="input input-solid h-10 min-w-0 flex-1"
               maxlength={100}
               required
             />
           </label>
           <label class="flex flex-col gap-1">
-            <span>初始阶段</span>
-            <select name="initialPhase" class="select">
+            <span class="shrink-0">初始阶段</span>
+            <select
+              name="initialPhase"
+              class="h-10 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
+            >
               <option value="DECK_COLLECTION">收集牌组中</option>
               <option value="RUNNING">进行中</option>
             </select>
           </label>
           <label class="flex flex-col gap-1">
-            <span>牌组上限（0 不限）</span>
+            <span class="shrink-0">牌组上限（0 不限）</span>
             <input
               name="deckLimit"
               type="number"
               min="0"
               max="100"
               value="0"
-              class="input input-solid"
+              class="input input-solid h-10"
               required
             />
           </label>
           <label class="flex flex-col gap-1">
-            <span>总局数</span>
+            <span class="shrink-0">总局数</span>
             <input
               name="maxGames"
               type="number"
               min="1"
               max="99"
               value="3"
-              class="input input-solid"
+              class="input input-solid h-10"
               required
             />
           </label>
           <label class="flex flex-col gap-1">
-            <span>胜局数</span>
+            <span class="shrink-0">胜局数</span>
             <input
               name="winsRequired"
               type="number"
               min="1"
               max="99"
               value="2"
-              class="input input-solid"
+              class="input input-solid h-10"
               required
             />
           </label>
           <label class="flex flex-col gap-1">
-            <span>对局模式</span>
-            <select name="mode" class="select">
+            <span class="shrink-0">对局模式</span>
+            <select
+              name="mode"
+              class="h-10 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
+            >
               <option value="UNRESTRICTED">无限制</option>
               <option value="DUEL">决斗</option>
               <option value="CONQUEST">征服</option>
             </select>
           </label>
           <label class="flex items-center gap-2">
-            <input name="autoCreateGame" type="checkbox" /> 自动创建新局
+            <input
+              class="checkbox"
+              name="autoCreateGame"
+              type="checkbox"
+            />{" "}
+            自动创建新局
           </label>
           <label class="flex flex-col gap-1">
-            <span>预计开始</span>
+            <span class="shrink-0">预计开始</span>
             <input
               name="scheduledStart"
               type="datetime-local"
-              class="input input-solid"
+              class="input input-solid h-10"
             />
           </label>
           <label class="flex flex-col gap-1">
-            <span>预计结束</span>
+            <span class="shrink-0">预计结束</span>
             <input
               name="scheduledEnd"
               type="datetime-local"
-              class="input input-solid"
+              class="input input-solid h-10"
             />
           </label>
-          <label class="flex flex-col gap-1 sm:col-span-2">
-            <span>房间配置 JSON</span>
-            <textarea
-              name="roomConfig"
-              class="textarea textarea-solid font-mono"
-              rows="3"
-            >
-              {JSON.stringify({
-                initTotalActionTime: 45,
-                rerollTime: 40,
-                roundTotalActionTime: 60,
-                actionTime: 25,
-                watchable: true,
-              })}
-            </textarea>
-          </label>
+          <RoomConfigFields class="sm:col-span-2 lg:col-span-4" />
         </section>
         <section>
           <h3 class="font-bold text-lg mb-2">配对顺序</h3>
@@ -340,20 +335,24 @@ export default function EventEditor() {
         <section>
           <div class="flex flex-wrap gap-3 items-end mb-2">
             <h3 class="font-bold text-lg flex-1">候选参赛选手</h3>
-            <input
-              class="input input-solid"
-              placeholder="搜索昵称或 QQ"
-              value={search()}
-              onInput={(e) => setSearch(e.currentTarget.value)}
-            />
+            <label class="flex flex-col md:flex-row md:items-center gap-1 w-full md:w-auto">
+              <span class="shrink-0">搜索</span>
+              <input
+                class="input input-solid h-10"
+                placeholder="昵称或 QQ"
+                value={search()}
+                onInput={(e) => setSearch(e.currentTarget.value)}
+              />
+            </label>
           </div>
           <details class="rounded-lg b b-gray-2 p-3 mb-2">
             <summary class="cursor-pointer">根据历史场次筛选排序</summary>
-            <div class="mt-2 flex flex-wrap gap-3">
+            <div class="mt-2 flex flex-wrap items-center gap-3">
               <For each={events()?.filter((e) => e.phase === "FINISHED")}>
                 {(event) => (
-                  <label>
+                  <label class="flex items-center gap-2">
                     <input
+                      class="checkbox"
                       type="checkbox"
                       checked={historyIds().includes(event.id)}
                       onChange={(e) =>
@@ -433,6 +432,7 @@ export default function EventEditor() {
                       >
                         <td class="table-cell">
                           <input
+                            class="checkbox"
                             type="checkbox"
                             disabled={occupied()}
                             checked={checked().includes(candidate.id)}
