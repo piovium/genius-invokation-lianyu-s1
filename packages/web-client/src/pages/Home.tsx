@@ -172,7 +172,10 @@ export default function Home() {
                       {t("myDecks")}
                     </A>
                     <div class="flex flex-row gap-2">
-                      <A href="/decks/new" class="btn btn-outline-green h-6 py-0">
+                      <A
+                        href="/decks/new"
+                        class="btn btn-outline-green h-6 py-0"
+                      >
                         {t("add")}
                       </A>
                       <A href="/decks" class="btn btn-outline-blue h-6 py-0">
@@ -205,7 +208,14 @@ export default function Home() {
                             </div>
                           }
                         >
-                          {(deckData) => <DeckBriefInfo {...deckData} />}
+                          {(deckData) => (
+                            <DeckBriefInfo
+                              variant={
+                                deckData.competition ? "selected" : "normal"
+                              }
+                              {...deckData}
+                            />
+                          )}
                         </For>
                       </div>
                     </Match>

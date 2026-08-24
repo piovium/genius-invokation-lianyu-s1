@@ -144,7 +144,7 @@ export default function Decks() {
           <Match when={true}>
             <div class="overflow-y-auto scrollbar-thin-hover pb-6">
               <Show when={selected().length}>
-                <section class="mb-6 rounded-xl bg-purple-50 p-3 b b-purple-2">
+                <section class="mb-6 b-b-2 pb-6">
                   <div class="flex items-center justify-between mb-3">
                     <h3 class="text-lg font-bold">比赛牌组</h3>
                     <span class="text-sm">
@@ -159,11 +159,12 @@ export default function Decks() {
                       阶段，比赛牌组已锁定。
                     </p>
                   </Show>
-                  <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+                  <ul class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] md:gap-3">
                     <For each={available()}>
                       {(deckData) => (
                         <DeckBriefInfo
-                          competitionLabel="比赛牌组 · 可用"
+                          variant="selected"
+                          competitionAction="remove"
                           onCompetition={
                             canManage()
                               ? () => toggleCompetition(deckData, false)
@@ -173,17 +174,10 @@ export default function Decks() {
                         />
                       )}
                     </For>
-                  </ul>
-                </section>
-              </Show>
-              <Show when={exhausted().length}>
-                <section class="mb-6 rounded-xl bg-orange-50 p-3 b b-orange-2">
-                  <h3 class="text-lg font-bold mb-3">已耗尽比赛牌组</h3>
-                  <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
                     <For each={exhausted()}>
                       {(deckData) => (
                         <DeckBriefInfo
-                          competitionLabel={`已耗尽 · ${deckData.competition?.disableReason ?? "不可用"}`}
+                          variant="disabled"
                           {...deckData}
                         />
                       )}
@@ -203,13 +197,11 @@ export default function Decks() {
                     {(deckData) => (
                       <DeckBriefInfo
                         editable
+                        competitionAction={canManage() ? "add" : undefined}
                         onCompetition={
                           canManage()
                             ? () => toggleCompetition(deckData, true)
                             : undefined
-                        }
-                        competitionLabel={
-                          canManage() ? "设为比赛牌组" : undefined
                         }
                         onDelete={() => refetch()}
                         onPin={() => pinDeck(deckData)}
