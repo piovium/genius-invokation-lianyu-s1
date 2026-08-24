@@ -30,7 +30,7 @@ export function Header() {
     return current.type === "user" ? current : null;
   };
   return (
-    <header class="fixed top-0 left-0 w-100dvw flex flex-row h-[calc(3rem+var(--root-padding-top))] md:h-[calc(4rem+var(--root-padding-top))] pt-[var(--root-padding-top)] bg-white z-200 px-4 shadow-md items-center gap-2">
+    <header class="fixed top-0 left-0 w-100dvw hidden md:flex flex-row h-[calc(4rem+var(--root-padding-top))] pt-[var(--root-padding-top)] bg-white z-200 px-4 shadow-md items-center gap-2">
       <A href="/">
         <img src={Logo} class="h-10 md:h-12" />
       </A>
@@ -45,9 +45,9 @@ export function Header() {
       </div>
       <Show when={status().type === "user"}>
         <nav class="hidden md:flex gap-3 text-sm items-center">
-          <A class="btn btn-outline-blue" href="/decks">
+          {/* <A class="btn btn-outline-blue" href="/decks">
             我的牌组
-          </A>
+          </A> */}
           <Show when={user()?.role === "ADMIN"}>
             <A class="btn btn-outline-purple" href="/admin">
               赛事管理
