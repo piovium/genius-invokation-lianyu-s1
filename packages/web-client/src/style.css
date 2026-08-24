@@ -68,26 +68,35 @@ dialog[open] {
 }
 
 .deck-info-card {
+  --deck-info-card-color: 157 178 255;
   background: linear-gradient(
     0deg,
-    #9db2ff40 0%,
-    #9db2ff40 25%,
-    #9db2ff80 25%,
-    #9db2ff80 70%,
-    #9db2ff40 70%,
-    #9db2ff40 100%
+    rgb(var(--deck-info-card-color) / 25%) 0%,
+    rgb(var(--deck-info-card-color) / 25%) 25%,
+    rgb(var(--deck-info-card-color) / 50%) 25%,
+    rgb(var(--deck-info-card-color) / 50%) 70%,
+    rgb(var(--deck-info-card-color) / 25%) 70%,
+    rgb(var(--deck-info-card-color) / 25%) 100%
   );
+}
+
+.deck-info-card[data-variant="selected"] {
+  --deck-info-card-color: 196 181 253;
+}
+
+.deck-info-card[data-variant="disabled"] {
+  --deck-info-card-color: 209 213 219;
 }
 
 .deck-info-card:hover {
   background: linear-gradient(
     0deg,
-    #9db2ff60 0%,
-    #9db2ff60 25%,
-    #9db2ffa0 25%,
-    #9db2ffa0 70%,
-    #9db2ff60 70%,
-    #9db2ff60 100%
+    rgb(var(--deck-info-card-color) / 38%) 0%,
+    rgb(var(--deck-info-card-color) / 38%) 25%,
+    rgb(var(--deck-info-card-color) / 63%) 25%,
+    rgb(var(--deck-info-card-color) / 63%) 70%,
+    rgb(var(--deck-info-card-color) / 38%) 70%,
+    rgb(var(--deck-info-card-color) / 38%) 100%
   );
 }
 
