@@ -81,6 +81,7 @@ export const versionResolver = createOfficialVersionResolver(
   DEPS,
 );
 const customDataLoader = new CustomDataLoader();
+customDataLoader.setVersion(versionResolver);
 await customDataLoader.loadMod(...MATCH_CONFIG.mods);
 const [gameData, amOptions] = customDataLoader.done();
 
