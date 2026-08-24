@@ -15,7 +15,7 @@
 
 import { For, Match, Switch, createResource, Accessor, Show } from "solid-js";
 import { Layout } from "../layouts/Layout";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { A } from "@solidjs/router";
 import { DeckBriefInfo } from "../components/DeckBriefInfo";
 import type { Deck } from "@gi-tcg/typings";
@@ -120,9 +120,7 @@ export default function Decks() {
       }
       refetch();
     } catch (e) {
-      if (e instanceof AxiosError) {
-        alert(e.response?.data?.message || t("pinFailed"));
-      }
+      alert(errorMessage(e) || t("pinFailed"));
       console.error(e);
     }
   };

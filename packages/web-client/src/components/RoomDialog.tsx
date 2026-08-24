@@ -21,7 +21,7 @@ import {
   JSX,
   splitProps,
 } from "solid-js";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { DeckInfoProps } from "./DeckBriefInfo";
 import { roomIdToCode } from "../utils";
@@ -30,6 +30,7 @@ import { useAuth } from "../auth";
 import { useVersionContext } from "../App";
 import { useGuestDecks, useGuestInfo } from "../guest";
 import { useI18n } from "../i18n";
+import { errorMessage } from "../api/errors";
 
 function SelectableDeckInfo(
   props: DeckInfoProps & Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "id">,
@@ -195,9 +196,7 @@ export function RoomDialog(props: RoomDialogProps) {
       }
     } catch (e) {
       setAvailableDecks([]);
-      if (e instanceof AxiosError) {
-        alert(e.response?.data.message);
-      }
+      alert(errorMessage(e));
       console.error(e);
     }
     const currentSelectedDeckId = selectedDeck();
@@ -273,11 +272,7 @@ export function RoomDialog(props: RoomDialogProps) {
       const roomCode = roomIdToCode(roomId);
       navigate(`/rooms/${roomCode}?player=${playerId}&action=1`);
     } catch (e) {
-      if (e instanceof AxiosError) {
-        alert(e.response?.data.message);
-      } else if (e instanceof Error) {
-        alert(e.message);
-      }
+      alert(errorMessage(e));
       console.error(e);
     } finally {
       setEntering(false);
