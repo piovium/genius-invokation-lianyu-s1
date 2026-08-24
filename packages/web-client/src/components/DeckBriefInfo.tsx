@@ -23,10 +23,11 @@ import { copyShareCode } from "../utils";
 import { useI18n } from "../i18n";
 
 export interface DeckInfoProps extends DeckInfo {
+  variant?: "normal" | "selected" | "disabled";
   editable?: boolean;
   onDelete?: () => void;
   onPin?: () => void;
-  competitionLabel?: string;
+  competitionAction?: "add" | "remove";
   onCompetition?: () => void;
   viewable?: boolean;
 }
@@ -58,6 +59,7 @@ export function DeckBriefInfo(props: DeckInfoProps) {
   const navigate = useNavigate();
   const { status } = useAuth();
   const [, { removeGuestDeck }] = useGuestDecks();
+  const variant = () => props.variant ?? "normal";
 
   const viewDeck = (e: MouseEvent) => {
     e.stopPropagation();
@@ -92,15 +94,35 @@ export function DeckBriefInfo(props: DeckInfoProps) {
   return (
     <div
       class="w-full deck-info-card transition-all flex flex-col p-1 md:p-2 rounded-xl select-none cursor-default"
+      classList={{ "text-gray-5": variant() === "disabled" }}
+      data-variant={variant()}
+      title={
+        variant() === "disabled"
+          ? (props.competition?.disableReason ?? undefined)
+          : undefined
+      }
       onClick={props.viewable === false ? undefined : viewDeck}
     >
       <div class="px-2 py-1 flex flex-row justify-between items-center">
-        <h5 class="font-bold text-blue-900 overflow-hidden whitespace-nowrap text-ellipsis">
+        <h5
+          class="font-bold overflow-hidden whitespace-nowrap text-ellipsis"
+          classList={{
+            "text-blue-900": variant() === "normal",
+            "text-purple-900": variant() === "selected",
+            "text-gray-6": variant() === "disabled",
+          }}
+        >
           {props.name}
         </h5>
         <div class="flex-shrink-0 flex flex-row gap-2">
           <button
-            class="btn color-blue-900 h-6 w-6 p-0 hover:color-blue-500"
+            class="btn h-6 w-6 p-0"
+            classList={{
+              "color-blue-900 hover:color-blue-500": variant() === "normal",
+              "color-purple-900 hover:color-purple-500":
+                variant() === "selected",
+              "color-gray-5 hover:color-gray-7": variant() === "disabled",
+            }}
             title={t("copyShareCode")}
             onClick={copyCode}
           >
@@ -127,20 +149,31 @@ export function DeckBriefInfo(props: DeckInfoProps) {
           </Show>
         </div>
       </div>
-      <div class="p-1 md:p-2 flex flex-row items-center justify-around">
+      <div
+        class="p-1 md:p-2 flex flex-row items-center justify-around"
+        classList={{
+          "saturate-30": variant() === "disabled",
+        }}
+      >
         <For each={props.characters}>{(id) => <CharacterAvatar id={id} />}</For>
       </div>
-      <Show when={props.competitionLabel}>
-        <button
-          class="mt-1 btn btn-outline-purple text-xs"
-          disabled={!props.onCompetition}
-          onClick={(e) => {
-            e.stopPropagation();
-            props.onCompetition?.();
-          }}
-        >
-          {props.competitionLabel}
-        </button>
+      <Show when={props.competitionAction}>
+        {(action) => (
+          <button
+            class="mt-1 btn text-xs"
+            classList={{
+              "btn-outline-purple": action() === "add",
+              "btn-outline-red": action() === "remove",
+            }}
+            disabled={!props.onCompetition}
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onCompetition?.();
+            }}
+          >
+            {action() === "add" ? "加入比赛牌组" : "移除比赛牌组"}
+          </button>
+        )}
       </Show>
     </div>
   );
