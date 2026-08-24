@@ -6,6 +6,7 @@ import {
   createResource,
   createSignal,
   onCleanup,
+  onMount,
 } from "solid-js";
 import { Layout } from "../layouts/Layout";
 import { useAuth } from "../auth";
@@ -28,14 +29,13 @@ export default function Register() {
   const auth = useAuth();
   const [params] = useSearchParams();
   const [guestDecks, { clearGuestDecks }] = useGuestDecks();
+  const prefilledQq = typeof params.qq === "string" ? params.qq : "";
   const [settings, { refetch: refetchSettings }] = createResource(() =>
     axios
       .get<RegistrationSettings>("registration/settings")
       .then((r) => r.data),
   );
-  const [qq, setQq] = createSignal(
-    typeof params.qq === "string" ? params.qq : "",
-  );
+  const [qq, setQq] = createSignal(prefilledQq);
   const [name, setName] = createSignal(
     typeof params.name === "string" ? params.name : "",
   );
@@ -91,6 +91,10 @@ export default function Register() {
       setBusy(false);
     }
   };
+
+  onMount(() => {
+    if (prefilledQq) void checkQq();
+  });
 
   const finishRegistration = async (result: AuthResult) => {
     const snapshot = guestDecks().map(({ id, name, characters, cards }) => ({
