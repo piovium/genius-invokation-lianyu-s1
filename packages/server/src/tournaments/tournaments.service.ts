@@ -1185,7 +1185,7 @@ export class TournamentsService {
       include: {
         event: true,
         participants: {
-          include: { user: { select: { id: true, name: true } } },
+          include: { user: { select: { id: true, qq: true, name: true } } },
           orderBy: { who: "asc" },
         },
         games: {
