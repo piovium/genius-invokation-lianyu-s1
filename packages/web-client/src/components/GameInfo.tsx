@@ -14,63 +14,94 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-import { onMount, Show } from "solid-js";
 import axios from "axios";
-import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { errorMessage } from "../api/errors";
 
-dayjs.extend(relativeTime);
+type GameEndReason = "NORMAL" | "ENGINE_ERROR" | "SURRENDER" | "ADMIN";
 
-export interface GameInfoProps {
-  gameId: number;
-  createdAt: string;
-  winnerId: number | null;
+export interface GameRecord {
+  who: number;
+  deckName: string | null;
+  game: {
+    id: number;
+    matchId: number | null;
+    winnerWho: number | null;
+    manualWinnerWho: number | null;
+    roundCount: number | null;
+    endReason: GameEndReason | null;
+    countForStats: boolean;
+    finishedAt: string | null;
+    createdAt: string;
+  };
 }
 
-export function GameInfo(props: GameInfoProps) {
-  const { status } = useAuth();
-  const { t, locale } = useI18n();
-  onMount(() => {
-    dayjs.locale(locale().toLocaleLowerCase());
-  });
+export function GameInfo(props: { record: GameRecord }) {
+  const { t } = useI18n();
+  const game = () => props.record.game;
+  const winnerWho = () => game().manualWinnerWho ?? game().winnerWho;
+  const won = () => winnerWho() !== null && winnerWho() === props.record.who;
+  const resultText = () => {
+    if (winnerWho() === null) return "平";
+    if (game().manualWinnerWho !== null) {
+      return won() ? "胜" : "败";
+    }
+    return won() ? "胜" : "败";
+  };
 
   const downloadLog = async () => {
     try {
-      const { data } = await axios.get(`games/${props.gameId}`);
-      const blob = new Blob([data.data], { type: "application/json" });
+      const { data } = await axios.get<{ stateLog: unknown }>(
+        `games/${game().id}`,
+      );
+      const blob = new Blob([JSON.stringify(data.stateLog)], {
+        type: "application/json",
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `gameLog-${props.gameId}.json`;
+      a.download = `gameLog-${game().id}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
-      alert(
-        t("downloadFailed", {
-          message: errorMessage(e),
-        }),
-      );
+      alert(t("downloadFailed", { message: errorMessage(e) }));
     }
   };
+
   return (
-    <div class="flex flex-row gap-2 items-center">
-      <div class="w-24" title={props.createdAt}>
-        {dayjs(props.createdAt).fromNow()}
-      </div>
-      <div class="text-lg">
-        <Show
-          when={status()?.id === props.winnerId}
-          fallback={<div class="text-red-400">{t("defeat")}</div>}
-        >
-          <div class="text-green-400">{t("victory")}</div>
-        </Show>
-      </div>
-      <button class="btn btn-outline" onClick={downloadLog}>
-        {t("downloadLog")}
+    <article
+      class="h-11 w-full min-w-0 flex items-center justify-between gap-2 rounded-lg px-2"
+      classList={{
+        "bg-amber-1/50": game().matchId === null,
+        "bg-purple-1/50": game().matchId !== null,
+      }}
+    >
+      <span
+        class="badge shrink-0"
+        classList={{
+          "badge-soft-success": won(),
+          "badge-soft-error": winnerWho() !== null && !won(),
+          "badge-soft-warning": winnerWho() === null,
+        }}
+      >
+        {resultText()}
+      </span>
+      <time
+        class="shrink-0 text-xs text-gray-5"
+        datetime={game().finishedAt ?? game().createdAt}
+      >
+        {dayjs(game().finishedAt ?? game().createdAt).format("MM-DD HH:mm")}
+      </time>
+      <button
+        type="button"
+        class="btn btn-ghost h-7 w-7 shrink-0 p-0"
+        title={t("downloadLog")}
+        aria-label={t("downloadLog")}
+        onClick={downloadLog}
+      >
+        <i class="i-mdi-download text-lg" />
       </button>
-    </div>
+    </article>
   );
 }
