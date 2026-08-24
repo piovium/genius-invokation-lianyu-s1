@@ -15,7 +15,15 @@ import type {
 } from "../../api/models";
 import type { DeckInfo } from "../Decks";
 import { errorMessage } from "../../api/errors";
-import { AdminPage, fmt, modeLabel, phaseLabel } from "./shared";
+import {
+  AdminPage,
+  ReasonDialog,
+  RoomConfigFields,
+  fmt,
+  modeLabel,
+  phaseLabel,
+  roomConfigFromForm,
+} from "./shared";
 
 function DeckAssignment(props: {
   match: TournamentMatch;
@@ -28,6 +36,7 @@ function DeckAssignment(props: {
       .then((r) => r.data.data),
   );
   const [selected, setSelected] = createSignal<number | null>(null);
+  const [confirming, setConfirming] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const isCompetitionDeck = (deckId: number) =>
     props.match.matchDecks.some(
@@ -39,19 +48,16 @@ function DeckAssignment(props: {
     const deckId = selected();
     return deckId !== null && isCompetitionDeck(deckId);
   };
-  const updateAssignment = async () => {
+  const updateAssignment = async (reason: string) => {
     if (selected() === null) return;
     const unassign = selectedIsCompetitionDeck();
-    const reason = prompt(
-      unassign ? "取消指定比赛牌组的原因" : "指定比赛牌组的原因",
-    );
-    if (!reason?.trim()) return;
     setBusy(true);
     try {
       const url = `admin/matches/${props.match.id}/participants/${props.participant.userId}/decks`;
-      const data = { deckId: selected(), reason: reason.trim() };
+      const data = { deckId: selected(), reason };
       if (unassign) await axios.delete(url, { data });
       else await axios.put(url, data);
+      setConfirming(false);
       props.onDone();
     } catch (e) {
       alert(errorMessage(e));
@@ -71,9 +77,9 @@ function DeckAssignment(props: {
         }{" "}
         个
       </p>
-      <div class="flex gap-2">
+      <div class="flex items-center gap-2">
         <select
-          class="select min-w-0 flex-1"
+          class="h-10 min-w-0 flex-1 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
           value={selected() ?? ""}
           onChange={(e) => setSelected(Number(e.currentTarget.value))}
         >
@@ -102,11 +108,21 @@ function DeckAssignment(props: {
             selected() === null ||
             props.match.event?.phase === "FINISHED"
           }
-          onClick={updateAssignment}
+          onClick={() => setConfirming(true)}
         >
           {selectedIsCompetitionDeck() ? "取消指定" : "指定"}
         </button>
       </div>
+      <ReasonDialog
+        open={confirming()}
+        title={
+          selectedIsCompetitionDeck() ? "取消指定比赛牌组" : "指定比赛牌组"
+        }
+        description={`选手：${props.participant.user.name}`}
+        busy={busy()}
+        onCancel={() => setConfirming(false)}
+        onConfirm={(reason) => void updateAssignment(reason)}
+      />
     </div>
   );
 }
@@ -120,6 +136,8 @@ export default function AdminMatch() {
   const [selectedGame, setSelectedGame] = createSignal<TournamentGame | null>(
     null,
   );
+  const [settingWinner, setSettingWinner] = createSignal(false);
+  const [winnerError, setWinnerError] = createSignal("");
   const [editingMatch, setEditingMatch] = createSignal(false);
   const [editError, setEditError] = createSignal("");
   const [busy, setBusy] = createSignal(false);
@@ -189,12 +207,11 @@ export default function AdminMatch() {
     setBusy(true);
     setEditError("");
     try {
-      const roomConfig = JSON.parse(String(form.get("roomConfig") || "{}"));
       await axios.patch(`admin/matches/${data.id}`, {
         maxGames,
         winsRequired,
         mode: String(form.get("mode")),
-        roomConfig,
+        roomConfig: roomConfigFromForm(form),
       });
       setEditingMatch(false);
       refetch();
@@ -205,25 +222,27 @@ export default function AdminMatch() {
       setBusy(false);
     }
   };
-  const setWinner = async () => {
+  const setWinner = async (event: SubmitEvent) => {
+    event.preventDefault();
     const data = match();
     if (!data) return;
-    const value = prompt(
-      `输入赢家用户 ID；留空清除。候选：${data.participants.map((p) => `${p.user.name}=${p.userId}`).join("，")}`,
-      data.winnerUserId ? String(data.winnerUserId) : "",
-    );
-    if (value === null) return;
-    const reason = prompt("介入原因");
-    if (!reason?.trim()) return;
+    const form = new FormData(event.currentTarget as HTMLFormElement);
+    const winner = String(form.get("winnerUserId") ?? "");
+    const reason = String(form.get("reason") ?? "").trim();
+    setBusy(true);
+    setWinnerError("");
     try {
       await axios.patch(`admin/matches/${data.id}/intervention`, {
-        winnerUserId: value.trim() ? Number(value) : null,
-        reason: reason.trim(),
+        winnerUserId: winner ? Number(winner) : null,
+        reason,
       });
+      setSettingWinner(false);
       refetch();
       setMessage("盘次赢家已裁定，自动创建新局已关闭。");
     } catch (e) {
-      setMessage(errorMessage(e));
+      setWinnerError(errorMessage(e));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -314,7 +333,14 @@ export default function AdminMatch() {
           >
             轮空胜利
           </button>
-          <button class="btn btn-outline-red" onClick={setWinner}>
+          <button
+            class="btn btn-outline-red"
+            disabled={!match()}
+            onClick={() => {
+              setWinnerError("");
+              setSettingWinner(true);
+            }}
+          >
             裁定盘次赢家
           </button>
         </div>
@@ -468,6 +494,64 @@ export default function AdminMatch() {
           </>
         )}
       </Show>
+      <Show when={settingWinner() && match()}>
+        <div class="fixed inset-0 z-300 bg-black/40 flex items-center justify-center p-4">
+          <form
+            class="bg-white rounded-xl shadow-xl p-5 w-full max-w-110"
+            onSubmit={setWinner}
+          >
+            <h3 class="text-xl font-bold">裁定盘次赢家</h3>
+            <p class="mt-2 text-sm text-gray-6">
+              提交后将关闭该盘自动创建新局。
+            </p>
+            <label class="flex flex-col md:flex-row md:items-center gap-1 mt-3">
+              <span class="shrink-0">赢家</span>
+              <select
+                name="winnerUserId"
+                class="h-10 flex-1 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
+                value={match()?.winnerUserId ?? ""}
+                autofocus
+              >
+                <option value="">清除裁定赢家</option>
+                <For each={match()?.participants}>
+                  {(participant) => (
+                    <option value={participant.userId}>
+                      {participant.user.name}（QQ {participant.user.qq ?? "未知"}）
+                    </option>
+                  )}
+                </For>
+              </select>
+            </label>
+            <label class="flex flex-col gap-1 mt-3">
+              <span class="shrink-0">审计原因</span>
+              <textarea
+                name="reason"
+                class="min-h-24 w-full rounded-lg b b-gray-3 bg-white px-3 py-2 outline-none focus:b-primary"
+                maxlength={500}
+                required
+              />
+            </label>
+            <Show when={winnerError()}>
+              <div class="alert alert-border-error mt-3">
+                <p>{winnerError()}</p>
+              </div>
+            </Show>
+            <div class="flex justify-end gap-3 mt-4">
+              <button
+                type="button"
+                class="btn btn-ghost"
+                disabled={busy()}
+                onClick={() => setSettingWinner(false)}
+              >
+                取消
+              </button>
+              <button class="btn btn-solid-error" disabled={busy()}>
+                {busy() ? "正在提交…" : "确认裁定"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Show>
       <Show when={selectedGame()}>
         {(game) => (
           <div class="fixed inset-0 z-300 bg-black/40 flex items-center justify-center p-4">
@@ -481,18 +565,22 @@ export default function AdminMatch() {
                   <p>该局可能正在运行，提交将立即中止双方当前游戏。</p>
                 </div>
               </Show>
-              <label class="flex flex-col gap-1 mt-3">
-                <span>目标状态</span>
-                <select name="status" class="select" value={game().status}>
+              <label class="flex flex-col md:flex-row md:items-center gap-1 mt-3">
+                <span class="shrink-0">目标状态</span>
+                <select
+                  name="status"
+                  class="h-10 flex-1 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
+                  value={game().status}
+                >
                   <option value="PENDING">未开始</option>
                   <option value="FINISHED">已结束</option>
                 </select>
               </label>
-              <label class="flex flex-col gap-1 mt-3">
-                <span>手动赢家</span>
+              <label class="flex flex-col md:flex-row md:items-center gap-1 mt-3">
+                <span class="shrink-0">手动赢家</span>
                 <select
                   name="manualWinnerWho"
-                  class="select"
+                  class="h-10 flex-1 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
                   value={game().manualWinnerWho ?? ""}
                 >
                   <option value="">无</option>
@@ -506,8 +594,9 @@ export default function AdminMatch() {
                   </For>
                 </select>
               </label>
-              <label class="flex gap-2 mt-3">
+              <label class="flex items-center gap-2 mt-3">
                 <input
+                  class="checkbox"
                   name="countForStats"
                   type="checkbox"
                   checked={game().countForStats}
@@ -515,10 +604,10 @@ export default function AdminMatch() {
                 计入业务统计
               </label>
               <label class="flex flex-col gap-1 mt-3">
-                <span>介入原因</span>
+                <span class="shrink-0">介入原因</span>
                 <textarea
                   name="reason"
-                  class="textarea textarea-solid"
+                  class="min-h-24 w-full rounded-lg b b-gray-3 bg-white px-3 py-2 outline-none focus:b-primary"
                   maxlength={500}
                   required
                 />
@@ -549,48 +638,45 @@ export default function AdminMatch() {
               <h3 class="text-xl font-bold">编辑盘次配置</h3>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 <label class="flex flex-col gap-1">
-                  <span>总局数</span>
+                  <span class="shrink-0">总局数</span>
                   <input
                     name="maxGames"
                     type="number"
                     min="1"
                     max="99"
-                    class="input input-solid"
+                    class="input input-solid h-10"
                     value={data().maxGames}
                     required
                   />
                 </label>
                 <label class="flex flex-col gap-1">
-                  <span>胜局数</span>
+                  <span class="shrink-0">胜局数</span>
                   <input
                     name="winsRequired"
                     type="number"
                     min="1"
                     max="99"
-                    class="input input-solid"
+                    class="input input-solid h-10"
                     value={data().winsRequired}
                     required
                   />
                 </label>
-                <label class="flex flex-col gap-1 sm:col-span-2">
-                  <span>对局模式</span>
-                  <select name="mode" class="select" value={data().mode}>
+                <label class="flex flex-col md:flex-row md:items-center gap-1 sm:col-span-2">
+                  <span class="shrink-0">对局模式</span>
+                  <select
+                    name="mode"
+                    class="h-10 flex-1 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
+                    value={data().mode}
+                  >
                     <option value="UNRESTRICTED">无限制</option>
                     <option value="DUEL">决斗</option>
                     <option value="CONQUEST">征服</option>
                   </select>
                 </label>
-                <label class="flex flex-col gap-1 sm:col-span-2">
-                  <span>房间配置 JSON</span>
-                  <textarea
-                    name="roomConfig"
-                    class="textarea textarea-solid font-mono"
-                    rows="9"
-                    required
-                  >
-                    {JSON.stringify(data().roomConfig, null, 2)}
-                  </textarea>
-                </label>
+                <RoomConfigFields
+                  class="sm:col-span-2"
+                  value={data().roomConfig}
+                />
               </div>
               <Show when={editError()}>
                 <div class="alert alert-border-error mt-3">

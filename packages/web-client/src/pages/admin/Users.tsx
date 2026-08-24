@@ -97,34 +97,34 @@ export default function AdminUsers() {
   return (
     <AdminPage title="用户与报名管理">
       <form
-        class="rounded-xl b b-gray-2 p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_8rem_auto] gap-3 items-end"
+        class="rounded-xl b b-gray-2 p-4 mb-4 flex flex-col md:flex-row md:items-center gap-3"
         onSubmit={saveSettings}
       >
-        <label class="flex flex-col gap-1">
-          <span>报名开始时间（本地时区）</span>
+        <label class="flex flex-col md:flex-row md:items-center gap-1 flex-1">
+          <span class="shrink-0">报名开始时间</span>
           <input
             name="opensAt"
             type="datetime-local"
-            class="input input-solid"
+            class="input input-solid h-10"
             value={localInput(settings()?.opensAt ?? null)}
           />
         </label>
-        <label class="flex flex-col gap-1">
-          <span>报名截止时间（本地时区）</span>
+        <label class="flex flex-col md:flex-row md:items-center gap-1 flex-1">
+          <span class="shrink-0">报名截止时间</span>
           <input
             name="cutoffAt"
             type="datetime-local"
-            class="input input-solid"
+            class="input input-solid h-10"
             value={localInput(settings()?.cutoffAt ?? null)}
           />
         </label>
-        <label class="flex flex-col gap-1">
-          <span>报名限额（0 不限）</span>
+        <label class="flex flex-col md:flex-row md:items-center gap-1 flex-1">
+          <span class="shrink-0">报名限额（0 不限）</span>
           <input
             name="limit"
             type="number"
             min="0"
-            class="input input-solid"
+            class="input input-solid h-10"
             value={settings()?.limit ?? 0}
             required
           />
@@ -134,10 +134,10 @@ export default function AdminUsers() {
         </button>
       </form>
       <div class="flex flex-wrap gap-3 items-end mb-3">
-        <label class="flex flex-col gap-1">
-          <span class="text-sm">报名状态</span>
+        <label class="flex flex-col md:flex-row md:items-center gap-1 flex-1">
+          <span class="shrink-0">报名状态</span>
           <select
-            class="select"
+            class="b-1 rounded-full px-2 py-1"
             value={filter()}
             onChange={(e) => {
               setFilter(e.currentTarget.value as CompetitionStatus | "");
@@ -150,8 +150,9 @@ export default function AdminUsers() {
             <option value="PLAYER">参赛选手</option>
           </select>
         </label>
-        <label>
+        <label class="flex gap-2 items-center">
           <input
+            class="checkbox"
             type="checkbox"
             checked={descending()}
             onChange={(e) => setDescending(e.currentTarget.checked)}
@@ -188,6 +189,7 @@ export default function AdminUsers() {
             <tr class="table-row">
               <th class="table-head">
                 <input
+                  class="checkbox"
                   type="checkbox"
                   checked={
                     !!users()?.length && selected().length === users()?.length
@@ -216,6 +218,7 @@ export default function AdminUsers() {
                   <td class="table-cell">
                     <input
                       type="checkbox"
+                      class="checkbox"
                       checked={selected().includes(user.id)}
                       onChange={(e) =>
                         setSelected(
