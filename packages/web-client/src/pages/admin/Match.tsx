@@ -15,6 +15,8 @@ import type {
 } from "../../api/models";
 import type { DeckInfo } from "../Decks";
 import { errorMessage } from "../../api/errors";
+import { ToggleSwitch } from "../../components/ToggleSwitch";
+import { useI18n } from "../../i18n";
 import {
   AdminPage,
   ReasonDialog,
@@ -25,11 +27,19 @@ import {
   roomConfigFromForm,
 } from "./shared";
 
+const endReasonLabel: Record<string, string> = {
+  NORMAL: "正常结束",
+  ENGINE_ERROR: "引擎错误",
+  SURRENDER: "投降",
+  ADMIN: "管理员结束",
+};
+
 function DeckAssignment(props: {
   match: TournamentMatch;
   participant: Participant;
   onDone: () => void;
 }) {
+  const { assetsManager } = useI18n();
   const [decks] = createResource<DeckInfo[]>(() =>
     axios
       .get(`admin/users/${props.participant.userId}/decks`)
@@ -48,6 +58,20 @@ function DeckAssignment(props: {
     const deckId = selected();
     return deckId !== null && isCompetitionDeck(deckId);
   };
+  const selectedDeck = () =>
+    decks()?.find((deck) => deck.id === selected()) ?? null;
+  const deckGroups = () => [
+    {
+      label: "比赛牌组",
+      competition: true,
+      decks: (decks() ?? []).filter((deck) => isCompetitionDeck(deck.id)),
+    },
+    {
+      label: "普通牌组",
+      competition: false,
+      decks: (decks() ?? []).filter((deck) => !isCompetitionDeck(deck.id)),
+    },
+  ];
   const updateAssignment = async (reason: string) => {
     if (selected() === null) return;
     const unassign = selectedIsCompetitionDeck();
@@ -77,48 +101,53 @@ function DeckAssignment(props: {
         }{" "}
         个
       </p>
-      <div class="flex items-center gap-2">
-        <select
-          class="h-10 min-w-0 flex-1 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
-          value={selected() ?? ""}
-          onChange={(e) => setSelected(Number(e.currentTarget.value))}
-        >
-          <option value="" disabled>
-            选择用户牌组
-          </option>
-          <For each={decks()}>
-            {(deck) => (
-              <option value={deck.id}>
-                {isCompetitionDeck(deck.id) ? "【比赛牌组】" : "【其他牌组】"}
-                {deck.name}（
-                {(deck.characterNames ?? deck.characters.map(String)).join("+")}
-                &nbsp;/&nbsp;{deck.id}）
-              </option>
-            )}
-          </For>
-        </select>
-        <button
-          class={
-            selectedIsCompetitionDeck()
-              ? "btn btn-outline-red"
-              : "btn btn-outline-primary"
-          }
-          disabled={
-            busy() ||
-            selected() === null ||
-            props.match.event?.phase === "FINISHED"
-          }
-          onClick={() => setConfirming(true)}
-        >
-          {selectedIsCompetitionDeck() ? "取消指定" : "指定"}
-        </button>
+      <div class="h-24 overflow-y-auto rounded-lg flex flex-wrap gap-1.5 scrollbar-thin-hover">
+        <For each={deckGroups()}>
+          {(group) => (
+            <For each={group.decks}>
+              {(deck) => (
+                <button
+                  type="button"
+                  class="flex items-center rounded-full p-0.5 h-8.5 b"
+                  classList={{
+                    "b-purple-3 bg-purple-1 hover:bg-purple-2":
+                      group.competition,
+                    "b-blue-3 bg-blue-1 hover:bg-blue-2": !group.competition,
+                  }}
+                  disabled={busy() || props.match.event?.phase === "FINISHED"}
+                  title={`${group.competition ? "取消指定" : "指定"}：${deck.name}`}
+                  aria-label={`${group.competition ? "取消指定" : "指定"}牌组 ${deck.name}`}
+                  onClick={() => {
+                    setSelected(deck.id);
+                    setConfirming(true);
+                  }}
+                >
+                  <For each={deck.characters}>
+                    {(characterId) => (
+                      <img
+                        class="h-7 w-7 rounded-full b b-gray-3 object-cover"
+                        src={assetsManager().getImageUrlSync(characterId, {
+                          type: "icon",
+                        })}
+                        alt={
+                          assetsManager().getNameSync(characterId) ??
+                          String(characterId)
+                        }
+                      />
+                    )}
+                  </For>
+                </button>
+              )}
+            </For>
+          )}
+        </For>
       </div>
       <ReasonDialog
         open={confirming()}
         title={
           selectedIsCompetitionDeck() ? "取消指定比赛牌组" : "指定比赛牌组"
         }
-        description={`选手：${props.participant.user.name}`}
+        description={`选手：${props.participant.user.name}；牌组：${selectedDeck()?.name ?? "—"}`}
         busy={busy()}
         onCancel={() => setConfirming(false)}
         onConfirm={(reason) => void updateAssignment(reason)}
@@ -129,6 +158,7 @@ function DeckAssignment(props: {
 
 export default function AdminMatch() {
   const params = useParams();
+  const { assetsManager } = useI18n();
   const [match, { refetch }] = createResource<TournamentMatch>(() =>
     axios.get(`admin/matches/${params.id}`).then((r) => r.data),
   );
@@ -181,18 +211,6 @@ export default function AdminMatch() {
     }
   };
   const action = (url: string, success: string) => act(url, {}, success);
-  const toggleAuto = async () => {
-    const data = match();
-    if (!data) return;
-    try {
-      await axios.patch(`admin/matches/${data.id}`, {
-        autoCreateGame: !data.autoCreateGame,
-      });
-      refetch();
-    } catch (e) {
-      setMessage(errorMessage(e));
-    }
-  };
   const editMatch = async (event: SubmitEvent) => {
     event.preventDefault();
     const data = match();
@@ -211,6 +229,7 @@ export default function AdminMatch() {
         maxGames,
         winsRequired,
         mode: String(form.get("mode")),
+        autoCreateGame: form.get("autoCreateGame") === "on",
         roomConfig: roomConfigFromForm(form),
       });
       setEditingMatch(false);
@@ -355,55 +374,49 @@ export default function AdminMatch() {
         {(data) => (
           <>
             <section class="rounded-xl b b-gray-2 p-4 mb-4">
-              <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <small>场次</small>
+                  <small class="text-gray-5">场次</small>
                   <p>{data().event?.name}</p>
                 </div>
                 <div>
-                  <small>阶段</small>
-                  <p>{data().event ? phaseLabel[data().event!.phase] : "—"}</p>
+                  <small class="text-gray-5">阶段</small>
+                  <p>
+                    <span class="badge badge-soft-primary">
+                      {data().event ? phaseLabel[data().event!.phase] : "—"}
+                    </span>
+                  </p>
                 </div>
                 <div>
-                  <small>模式</small>
+                  <small class="text-gray-5">开始时间</small>
+                  <p>{fmt(data().scheduledStart)}</p>
+                </div>
+                <div>
+                  <small class="text-gray-5">结束时间</small>
+                  <p>{fmt(data().scheduledEnd)}</p>
+                </div>
+                <div>
+                  <small class="text-gray-5">模式</small>
                   <p>{modeLabel[data().mode]}</p>
                 </div>
                 <div>
-                  <small>赛制</small>
+                  <small class="text-gray-5">赛制</small>
                   <p>
                     {data().maxGames} 局 {data().winsRequired} 胜
                   </p>
                 </div>
                 <div>
-                  <small>日程</small>
+                  <small class="text-gray-5">自动创建</small>
+                  <p>{data().autoCreateGame ? "开启" : "关闭"}</p>
+                </div>
+                <div>
+                  <small class="text-gray-5">赢家</small>
                   <p>
-                    {fmt(data().scheduledStart)}
-                    <br />
-                    {fmt(data().scheduledEnd)}
+                    {data().participants.find(
+                      (p) => p.userId === data().winnerUserId,
+                    )?.user.name ?? "—"}
                   </p>
                 </div>
-              </div>
-              <div class="mt-3 flex items-center gap-3">
-                <span>
-                  自动创建新局：<b>{data().autoCreateGame ? "开启" : "关闭"}</b>
-                </span>
-                <button
-                  class="btn btn-ghost-primary"
-                  disabled={data().event?.phase === "FINISHED"}
-                  onClick={toggleAuto}
-                >
-                  切换
-                </button>
-                <Show when={data().winnerUserId}>
-                  <span class="badge badge-soft-success">
-                    赢家：
-                    {
-                      data().participants.find(
-                        (p) => p.userId === data().winnerUserId,
-                      )?.user.name
-                    }
-                  </span>
-                </Show>
               </div>
             </section>
             <h3 class="font-bold text-lg mb-2">双方牌组</h3>
@@ -425,10 +438,10 @@ export default function AdminMatch() {
                   <tr class="table-row">
                     <th class="table-head">对局</th>
                     <th class="table-head">状态</th>
-                    <th class="table-head">先后手 / 牌组</th>
+                    <th class="table-head">先后手</th>
+                    <th class="table-head">牌组</th>
                     <th class="table-head">原始 / 裁定赢家</th>
                     <th class="table-head">结束原因</th>
-                    <th class="table-head">回合数</th>
                     <th class="table-head">计入统计</th>
                     <th class="table-head">操作</th>
                   </tr>
@@ -454,18 +467,62 @@ export default function AdminMatch() {
                             {(player) => (
                               <div>
                                 {turnLabel(player.who)}：
-                                {participantName(player.userId)} /{" "}
-                                {player.deckName ?? "未选牌组"}
+                                {participantName(player.userId)}
+                              </div>
+                            )}
+                          </For>
+                        </td>
+                        <td class="table-cell min-w-44">
+                          <For each={game.players}>
+                            {(player) => (
+                              <div class="mb-1 last:mb-0 flex items-center gap-1">
+                                <Show
+                                  when={player.deckJson}
+                                  fallback={
+                                    <span class="text-sm text-gray-4">
+                                      未选牌组
+                                    </span>
+                                  }
+                                >
+                                  {(deck) => (
+                                    <div class="flex items-center rounded-full bg-gray-3 p-0.5">
+                                      <For each={deck().characters}>
+                                        {(characterId) => (
+                                          <img
+                                            class="h-7 w-7 rounded-full b b-purple-3 object-cover"
+                                            src={assetsManager().getImageUrlSync(
+                                              characterId,
+                                              { type: "icon" },
+                                            )}
+                                            alt={
+                                              assetsManager().getNameSync(
+                                                characterId,
+                                              ) ?? String(characterId)
+                                            }
+                                            title={
+                                              assetsManager().getNameSync(
+                                                characterId,
+                                              ) ?? String(characterId)
+                                            }
+                                          />
+                                        )}
+                                      </For>
+                                    </div>
+                                  )}
+                                </Show>
                               </div>
                             )}
                           </For>
                         </td>
                         <td class="table-cell">
-                          {playerName(game, game.winnerWho)} /{" "}
-                          {playerName(game, game.manualWinnerWho)}
+                          <div>原始：{playerName(game, game.winnerWho)}</div>
+                          <div>裁定：{playerName(game, game.manualWinnerWho)}</div>
                         </td>
-                        <td class="table-cell">{game.endReason ?? "—"}</td>
-                        <td class="table-cell">{game.roundCount ?? "—"}</td>
+                        <td class="table-cell">
+                          {game.endReason
+                            ? (endReasonLabel[game.endReason] ?? game.endReason)
+                            : "—"}
+                        </td>
                         <td class="table-cell">
                           {game.countForStats ? "是" : "否"}
                         </td>
@@ -516,7 +573,8 @@ export default function AdminMatch() {
                 <For each={match()?.participants}>
                   {(participant) => (
                     <option value={participant.userId}>
-                      {participant.user.name}（QQ {participant.user.qq ?? "未知"}）
+                      {participant.user.name}（QQ{" "}
+                      {participant.user.qq ?? "未知"}）
                     </option>
                   )}
                 </For>
@@ -661,7 +719,7 @@ export default function AdminMatch() {
                     required
                   />
                 </label>
-                <label class="flex flex-col md:flex-row md:items-center gap-1 sm:col-span-2">
+                <label class="flex flex-col gap-1">
                   <span class="shrink-0">对局模式</span>
                   <select
                     name="mode"
@@ -673,6 +731,13 @@ export default function AdminMatch() {
                     <option value="CONQUEST">征服</option>
                   </select>
                 </label>
+                <div class="h-17 self-end flex items-center gap-2">
+                  <ToggleSwitch
+                    name="autoCreateGame"
+                    checked={data().autoCreateGame}
+                  />
+                  <span>自动创建新局</span>
+                </div>
                 <RoomConfigFields
                   class="sm:col-span-2"
                   value={data().roomConfig}
