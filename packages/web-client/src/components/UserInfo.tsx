@@ -16,7 +16,7 @@
 import { createResource, For, Match, Show, Switch } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import axios from "axios";
-import { GameInfo } from "./GameInfo";
+import { GameInfo, type GameRecord } from "./GameInfo";
 import { ChessboardColor } from "./ChessboardColor";
 import { useI18n } from "../i18n";
 import { Portal } from "solid-js/web";
@@ -39,7 +39,7 @@ export function UserInfo(props: UserInfoProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [games] = createResource(() =>
-    axios.get<{ data: any[] }>(`games/mine`).then((res) => res.data),
+    axios.get<{ data: GameRecord[] }>(`games/mine`).then((res) => res.data),
   );
 
   let avatarSelectorEl: HTMLDialogElement | undefined;
@@ -125,9 +125,9 @@ export function UserInfo(props: UserInfoProps) {
             <ChessboardColor />
           </dl>
           <hr class="h-1 w-full text-gray-4 my-4" />
-          <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-4 w-full">
             <dt class="font-bold">{t("gameRecords")}</dt>
-            <dd class="flex flex-col gap-1">
+            <dd class="w-full grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2">
               <Switch>
                 <Match when={props.type === "guest"}>
                   {t("guestNoGameRecords")}
@@ -142,13 +142,7 @@ export function UserInfo(props: UserInfoProps) {
                 <Match when={games()}>
                   {(games) => (
                     <For each={games().data}>
-                      {(data) => (
-                        <GameInfo
-                          gameId={data.game.id}
-                          createdAt={data.game.createdAt}
-                          winnerId={data.game.winnerId}
-                        />
-                      )}
+                      {(record) => <GameInfo record={record} />}
                     </For>
                   )}
                 </Match>
