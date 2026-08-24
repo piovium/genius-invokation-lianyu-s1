@@ -266,7 +266,7 @@ export default function EventEditor() {
               type="number"
               min="1"
               max="99"
-              value="3"
+              value="1"
               class="input input-solid h-10"
               required
             />
@@ -278,7 +278,7 @@ export default function EventEditor() {
               type="number"
               min="1"
               max="99"
-              value="2"
+              value="1"
               class="input input-solid h-10"
               required
             />
@@ -299,6 +299,7 @@ export default function EventEditor() {
               class="checkbox"
               name="autoCreateGame"
               type="checkbox"
+              checked
             />{" "}
             自动创建新局
           </label>
@@ -318,7 +319,10 @@ export default function EventEditor() {
               class="input input-solid h-10"
             />
           </label>
-          <RoomConfigFields class="sm:col-span-2 lg:col-span-4" />
+          <RoomConfigFields
+            class="sm:col-span-2 lg:col-span-4"
+            value={{ watchable: false }}
+          />
         </section>
         <section>
           <h3 class="font-bold text-lg mb-2">配对顺序</h3>
