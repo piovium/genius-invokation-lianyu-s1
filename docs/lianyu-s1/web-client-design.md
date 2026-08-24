@@ -221,7 +221,7 @@ interveneGame(gameId, input);
 
 #### 第一步：验证 QQ
 
-- QQ 输入框从 `searchParams.qq` 预填；
+- QQ 输入框从 `searchParams.qq` 预填，并在存在预填值时自动校验一次；
 - 点击“验证群成员”调用 `POST /auth/registration/qq-check`；
 - 成功后锁定已验证 QQ、预填群昵称，并解锁后续字段；
 - 修改 QQ 会清除验证结果和后续敏感状态；
