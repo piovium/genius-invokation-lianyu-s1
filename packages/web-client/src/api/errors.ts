@@ -15,7 +15,7 @@ const messages: Record<string, string> = {
   INVALID_REGISTRATION_WINDOW: "报名开始时间必须早于报名截止时间",
   DUPLICATE_CHARACTER_SET: "已有角色构成相同的比赛牌组",
   COMPETITION_DECK_LOCKED: "比赛牌组已锁定",
-  COMPETITION_DECK_CHARACTERS_LOCKED: "比赛牌组不能增删角色",
+  COMPETITION_DECK_CHARACTERS_LOCKED: "比赛牌组不可更换角色，如需更换角色请先移除比赛牌组",
   COMPETITION_DECK_LIMIT_REACHED: "已达到比赛牌组数量上限",
   USER_IN_RUNNING_GAME: "当前仍有开放对局，请先完成对局或联系管理员",
   EVENT_PHASE_MISMATCH: "场次阶段已变化，请刷新后重试",
