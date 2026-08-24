@@ -565,7 +565,7 @@ export default function AdminMatch() {
               <span class="shrink-0">赢家</span>
               <select
                 name="winnerUserId"
-                class="h-10 flex-1 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
+                class="h-10 flex-1 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary w-full"
                 value={match()?.winnerUserId ?? ""}
                 autofocus
               >
