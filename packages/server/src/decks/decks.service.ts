@@ -28,7 +28,7 @@ import type {
 import { type Deck } from "@gi-tcg/typings";
 import { Prisma, type Deck as DeckModel } from "#prisma/client";
 import { ASSETS_MANAGER, verifyDeck, type PaginationResult } from "../utils";
-import { VERSIONS } from "@gi-tcg/core";
+import { CURRENT_VERSION } from "@gi-tcg/core";
 
 interface DeckWithVersion extends Deck {
   code: string;
@@ -51,7 +51,7 @@ export class DecksService {
   async deckToCode(deck: Deck): Promise<DeckWithVersion> {
     try {
       const sinceVersion = await verifyDeck(deck);
-      const requiredVersion = VERSIONS.indexOf(sinceVersion);
+      const requiredVersion = [CURRENT_VERSION as string].indexOf(sinceVersion);
       return {
         ...deck,
         code: ASSETS_MANAGER.encode(deck),
