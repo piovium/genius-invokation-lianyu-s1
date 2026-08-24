@@ -1,4 +1,4 @@
-import { A, useParams } from "@solidjs/router";
+import { useNavigate, useParams } from "@solidjs/router";
 import axios from "axios";
 import {
   For,
@@ -10,10 +10,25 @@ import {
 } from "solid-js";
 import type { TournamentEvent } from "../../api/models";
 import { errorMessage } from "../../api/errors";
+import { useI18n } from "../../i18n";
 import { AdminPage, fmt, modeLabel, phaseLabel } from "./shared";
+
+const fmtSchedule = (value: string | null | undefined) =>
+  value
+    ? new Date(value).toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
+    : "—";
 
 export default function AdminEvent() {
   const params = useParams();
+  const navigate = useNavigate();
+  const { assetsManager } = useI18n();
   const [event, { refetch }] = createResource<TournamentEvent>(() =>
     axios.get(`admin/events/${params.id}`).then((r) => r.data),
   );
@@ -124,14 +139,16 @@ export default function AdminEvent() {
       breadcrumbs={[{ title: "比赛场次", href: "/admin/events" }]}
       titleActions={
         <button
-          class="btn btn-ghost-primary text-sm"
+          class="btn btn-ghost-primary h-8 w-8 p-0"
+          title="重命名场次"
+          aria-label="重命名场次"
           disabled={!event() || event()?.phase === "FINISHED"}
           onClick={() => {
             setRenameError("");
             setRenaming(true);
           }}
         >
-          重命名
+          <i class="i-mdi-square-edit-outline text-lg" />
         </button>
       }
       actions={
@@ -176,14 +193,16 @@ export default function AdminEvent() {
                 <div class="flex items-center gap-2">
                   <small class="text-gray-5">牌组上限</small>
                   <button
-                    class="text-xs text-blue-6 hover:underline disabled:text-gray-4 disabled:no-underline"
+                    class="btn btn-ghost-primary h-6 w-6 p-0"
+                    title="修改牌组上限"
+                    aria-label="修改牌组上限"
                     disabled={data().phase !== "DECK_COLLECTION"}
                     onClick={() => {
                       setDeckLimitError("");
                       setEditingDeckLimit(true);
                     }}
                   >
-                    编辑
+                    <i class="i-mdi-square-edit-outline text-base" />
                   </button>
                 </div>
                 <p>{data().deckLimit || "不限"}</p>
@@ -203,11 +222,11 @@ export default function AdminEvent() {
                   <tr class="table-row">
                     <th class="table-head">盘次</th>
                     <th class="table-head">双方选手</th>
+                    <th class="table-head">比赛牌组</th>
                     <th class="table-head">日程</th>
-                    <th class="table-head">模式 / 赛制</th>
+                    <th class="table-head">赛制</th>
                     <th class="table-head">比分</th>
                     <th class="table-head">赢家</th>
-                    <th class="table-head">开放局</th>
                   </tr>
                 </thead>
                 <tbody class="table-body">
@@ -215,6 +234,14 @@ export default function AdminEvent() {
                     {(match) => {
                       const player = (who: number) =>
                         match.participants.find((p) => p.who === who);
+                      const decks = (who: number) => {
+                        const userId = player(who)?.userId;
+                        return userId === undefined
+                          ? []
+                          : match.matchDecks.filter(
+                              (deck) => deck.userId === userId,
+                            );
+                      };
                       const wins = (userId?: number) =>
                         match.games.filter((game) => {
                           const who = game.manualWinnerWho ?? game.winnerWho;
@@ -225,18 +252,31 @@ export default function AdminEvent() {
                           );
                         }).length;
                       return (
-                        <tr class="table-row">
+                        <tr
+                          class="table-row cursor-pointer hover:bg-blue-50"
+                          role="link"
+                          tabindex="0"
+                          aria-label={`查看盘次 #${match.id}`}
+                          onClick={() => navigate(`/admin/matches/${match.id}`)}
+                          onKeyDown={(keyEvent) => {
+                            if (keyEvent.target !== keyEvent.currentTarget) return;
+                            if (
+                              keyEvent.key === "Enter" ||
+                              keyEvent.key === " "
+                            ) {
+                              keyEvent.preventDefault();
+                              navigate(`/admin/matches/${match.id}`);
+                            }
+                          }}
+                        >
                           <td class="table-cell">
-                            <A
-                              class="text-blue-6 font-bold"
-                              href={`/admin/matches/${match.id}`}
-                            >
+                            <span class="text-blue-6 font-bold">
                               #{match.id}
-                            </A>
+                            </span>
                           </td>
                           <td class="table-cell">
-                            {player(0)?.user.name ?? "轮空"} vs{" "}
-                            {player(1)?.user.name ?? "轮空"}
+                            <div>{player(0)?.user.name ?? "轮空"}</div>
+                            <div>{player(1)?.user.name ?? "轮空"}</div>
                             <Show
                               when={match.participants.some(
                                 (p) => p.status === "WITHDRAWN",
@@ -247,14 +287,82 @@ export default function AdminEvent() {
                               </span>
                             </Show>
                           </td>
-                          <td class="table-cell">
-                            {fmt(match.scheduledStart)}
-                            <br />
-                            <small>至 {fmt(match.scheduledEnd)}</small>
+                          <td class="table-cell min-w-52">
+                            <For each={[0, 1]}>
+                              {(who) => (
+                                <div class="mb-1 last:mb-0 flex items-center gap-1">
+                                  <Show
+                                    when={player(who)}
+                                    fallback={
+                                      <span class="text-sm text-gray-4">轮空</span>
+                                    }
+                                  >
+                                    <For
+                                      each={decks(who)}
+                                      fallback={
+                                        <span class="text-sm text-gray-4">
+                                          未设置
+                                        </span>
+                                      }
+                                    >
+                                      {(deck) => (
+                                        <button
+                                          type="button"
+                                          class="flex items-center rounded-full bg-gray-3 p-0.5 hover:bg-purple-2"
+                                          classList={{
+                                            "grayscale opacity-50": !deck.usable,
+                                          }}
+                                          title={
+                                            deck.disableReason
+                                              ? `${deck.disableReason}；点击复制分享码`
+                                              : "点击复制分享码"
+                                          }
+                                          aria-label="复制牌组分享码"
+                                          onClick={(clickEvent) => {
+                                            clickEvent.stopPropagation();
+                                            void navigator.clipboard.writeText(
+                                              deck.code,
+                                            );
+                                          }}
+                                        >
+                                          <For each={deck.deckJson.characters}>
+                                            {(characterId) => (
+                                              <img
+                                                class="h-7 w-7 rounded-full b b-purple-3 object-cover"
+                                                src={assetsManager().getImageUrlSync(
+                                                  characterId,
+                                                  { type: "icon" },
+                                                )}
+                                                alt={
+                                                  assetsManager().getNameSync(
+                                                    characterId,
+                                                  ) ?? String(characterId)
+                                                }
+                                                title={
+                                                  assetsManager().getNameSync(
+                                                    characterId,
+                                                  ) ?? String(characterId)
+                                                }
+                                              />
+                                            )}
+                                          </For>
+                                        </button>
+                                      )}
+                                    </For>
+                                  </Show>
+                                </div>
+                              )}
+                            </For>
                           </td>
                           <td class="table-cell">
-                            {modeLabel[match.mode]} · {match.maxGames} 局{" "}
-                            {match.winsRequired} 胜
+                            <div>开始 {fmtSchedule(match.scheduledStart)}</div>
+                            <div>结束 {fmtSchedule(match.scheduledEnd)}</div>
+                          </td>
+                          <td class="table-cell">
+                            <div>{modeLabel[match.mode]}</div>
+                            <div>
+                              {match.maxGames} 局 {match.winsRequired} 胜
+                            </div>
                           </td>
                           <td class="table-cell">
                             {wins(player(0)?.userId)} :{" "}
@@ -264,12 +372,6 @@ export default function AdminEvent() {
                             {match.participants.find(
                               (p) => p.userId === match.winnerUserId,
                             )?.user.name ?? "—"}
-                          </td>
-                          <td class="table-cell">
-                            {
-                              match.games.filter((g) => g.status === "PENDING")
-                                .length
-                            }
                           </td>
                         </tr>
                       );
