@@ -97,9 +97,9 @@ export function ReasonDialog(props: {
             <p class="my-2 text-sm text-gray-6">{props.description}</p>
           </Show>
           <label class="flex flex-col gap-1 mt-3">
-            <span>操作原因</span>
+            <span class="shrink-0">操作原因</span>
             <textarea
-              class="textarea textarea-solid"
+              class="min-h-24 w-full rounded-lg b b-gray-3 bg-white px-3 py-2 outline-none focus:b-primary"
               maxlength={500}
               required
               onInput={(e) => (reason = e.currentTarget.value)}
@@ -121,6 +121,104 @@ export function ReasonDialog(props: {
       </div>
     </Show>
   );
+}
+
+const roomConfigDefaults = {
+  initTotalActionTime: 45,
+  rerollTime: 40,
+  roundTotalActionTime: 60,
+  actionTime: 25,
+  watchable: true,
+} as const;
+
+function roomConfigValue(
+  config: Record<string, unknown> | undefined,
+  key: keyof typeof roomConfigDefaults,
+) {
+  const value = config?.[key];
+  return typeof value === typeof roomConfigDefaults[key]
+    ? value
+    : roomConfigDefaults[key];
+}
+
+export function RoomConfigFields(props: {
+  value?: Record<string, unknown>;
+  class?: string;
+}) {
+  return (
+    <fieldset class={`rounded-lg b b-gray-2 p-3 ${props.class ?? ""}`}>
+      <legend class="px-2 font-bold">房间配置</legend>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label class="flex flex-col md:flex-row md:items-center gap-1">
+          <span class="shrink-0">初始化总时间（秒）</span>
+          <input
+            name="roomConfig.initTotalActionTime"
+            type="number"
+            min="0"
+            max="300"
+            class="input input-solid h-10 min-w-0 flex-1"
+            value={roomConfigValue(props.value, "initTotalActionTime") as number}
+            required
+          />
+        </label>
+        <label class="flex flex-col md:flex-row md:items-center gap-1">
+          <span class="shrink-0">每次重投时间（秒）</span>
+          <input
+            name="roomConfig.rerollTime"
+            type="number"
+            min="25"
+            max="300"
+            class="input input-solid h-10 min-w-0 flex-1"
+            value={roomConfigValue(props.value, "rerollTime") as number}
+            required
+          />
+        </label>
+        <label class="flex flex-col md:flex-row md:items-center gap-1">
+          <span class="shrink-0">每回合总时间（秒）</span>
+          <input
+            name="roomConfig.roundTotalActionTime"
+            type="number"
+            min="0"
+            max="300"
+            class="input input-solid h-10 min-w-0 flex-1"
+            value={roomConfigValue(props.value, "roundTotalActionTime") as number}
+            required
+          />
+        </label>
+        <label class="flex flex-col md:flex-row md:items-center gap-1">
+          <span class="shrink-0">每次行动时间（秒）</span>
+          <input
+            name="roomConfig.actionTime"
+            type="number"
+            min="25"
+            max="300"
+            class="input input-solid h-10 min-w-0 flex-1"
+            value={roomConfigValue(props.value, "actionTime") as number}
+            required
+          />
+        </label>
+      </div>
+      <label class="mt-3 flex items-center gap-2">
+        <input
+          class="checkbox"
+          name="roomConfig.watchable"
+          type="checkbox"
+          checked={roomConfigValue(props.value, "watchable") as boolean}
+        />
+        允许观战
+      </label>
+    </fieldset>
+  );
+}
+
+export function roomConfigFromForm(form: FormData): Record<string, unknown> {
+  return {
+    initTotalActionTime: Number(form.get("roomConfig.initTotalActionTime")),
+    rerollTime: Number(form.get("roomConfig.rerollTime")),
+    roundTotalActionTime: Number(form.get("roomConfig.roundTotalActionTime")),
+    actionTime: Number(form.get("roomConfig.actionTime")),
+    watchable: form.get("roomConfig.watchable") === "on",
+  };
 }
 
 export const phaseLabel = {
