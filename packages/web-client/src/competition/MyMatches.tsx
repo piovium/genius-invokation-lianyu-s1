@@ -42,6 +42,14 @@ const modeLabel = {
   DUEL: "决斗",
   CONQUEST: "征服",
 } as const;
+const formatMatchTime = (value: string) =>
+  new Date(value).toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 
 export function MyMatches() {
   const auth = useAuth();
@@ -165,11 +173,11 @@ export function MyMatches() {
                       </h4>
                       <span class="text-right text-sm text-gray-5">
                         {match.scheduledStart
-                          ? new Date(match.scheduledStart).toLocaleString()
+                          ? formatMatchTime(match.scheduledStart)
                           : "未指定"}{" "}
                         —{" "}
                         {match.scheduledEnd
-                          ? new Date(match.scheduledEnd).toLocaleString()
+                          ? formatMatchTime(match.scheduledEnd)
                           : "未指定"}
                       </span>
                     </div>
@@ -191,7 +199,7 @@ export function MyMatches() {
                           type="button"
                           class="bg-transparent p-0 font-medium hover:text-blue-6 hover:underline disabled:text-inherit disabled:no-underline"
                           disabled={!opponent()?.user.qq}
-                          title={opponent()?.user.qq}
+                          title={`点击复制QQ: ${opponent()?.user.qq}`}
                           onClick={() =>
                             void navigator.clipboard.writeText(
                               opponent()?.user.qq ?? "",
