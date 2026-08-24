@@ -162,7 +162,7 @@ export default function Decks() {
                       {(deckData) => (
                         <DeckBriefInfo
                           variant="selected"
-                          competitionAction="remove"
+                          competitionAction={canManage() ? "remove" : undefined}
                           onCompetition={
                             canManage()
                               ? () => toggleCompetition(deckData, false)
