@@ -16,6 +16,7 @@
 import { ErrorBoundary, JSX } from "solid-js";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
+import { BottomNavigation } from "../components/BottomNavigation";
 import { Dynamic } from "solid-js/web";
 
 export interface LayoutProps {
@@ -32,7 +33,7 @@ export function Layout(props: LayoutProps) {
     <div class="w-full h-full flex flex-col justify-between">
       <Header />
       <main
-        class="flex-grow flex-shrink-0 min-h-0 w-full p-4 md:p-8 md:pb-0 mt-12 md:mt-16"
+        class="flex-grow flex-shrink-0 min-h-0 w-full p-4 md:p-8 md:pb-0 md:mt-16"
         classList={{
           "md:max-h-[calc(100vh-8.5rem)]": !props.pageScroll,
         }}
@@ -47,6 +48,7 @@ export function Layout(props: LayoutProps) {
         </Dynamic>
       </main>
 
+      <BottomNavigation />
       <Footer />
     </div>
   );

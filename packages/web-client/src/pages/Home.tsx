@@ -155,7 +155,7 @@ export default function Home() {
           </Match>
           <Match when={isLogin()}>
             <div class="flex flex-col h-full min-h-0">
-              <div class="flex-shrink-0 mb-8">
+              <div class="hidden md:block flex-shrink-0 mb-8">
                 <h2 class="text-3xl font-light">
                   {t("welcomeUser", {
                     guestPrefix:
@@ -164,8 +164,8 @@ export default function Home() {
                   })}
                 </h2>
               </div>
-              <div class="flex flex-grow flex-col-reverse md:flex-row gap-8 md:gap-0 min-h-0">
-                <div class="h-full w-full md:w-128 flex flex-col items-start md:bottom-opacity-gradient">
+              <div class="flex flex-grow md:flex-row gap-8 md:gap-0 min-h-0">
+                <div class="hidden h-full w-full md:w-128 md:flex flex-col items-start md:bottom-opacity-gradient">
                   <div class="flex flex-row justify-between mb-4 w-full md:pr-6 items-end">
                     <A href="/decks" class="text-xl font-bold">
                       {t("myDecks")}
@@ -223,7 +223,9 @@ export default function Home() {
                 <div class="b-r-gray-200 b-1 hidden md:block mr-8" />
                 <div class="flex-grow flex flex-col md:min-w-128">
                   <RegistrationBanner />
-                  <MyMatches />
+                  <div class="hidden md:block">
+                    <MyMatches />
+                  </div>
                   <h4 class="text-xl font-bold mb-5">{t("startGame")}</h4>
                   <Show
                     when={!currentRoom()}

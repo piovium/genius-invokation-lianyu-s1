@@ -52,6 +52,7 @@ export default function EditDeck() {
   );
   const [uploading, setUploading] = createSignal(false);
   const [uploadDone, setUploadDone] = createSignal(false);
+  const [competitionNoticeOpen, setCompetitionNoticeOpen] = createSignal(true);
   const [deckValue, setDeckValue] = createSignal<Deck>({
     characters: [],
     cards: [],
@@ -65,6 +66,10 @@ export default function EditDeck() {
         (DeckInfo & { competition?: MatchDeck | null }) | undefined
     )?.competition;
   const fullyLocked = () => competition()?.match?.event.phase === "RUNNING";
+  const competitionNotice = () =>
+    fullyLocked()
+      ? "场次进行中：比赛牌组已完全锁定，仅可导出分享码。"
+      : "牌组收集阶段：已经选中的比赛牌组，仅可调整角色顺序和变更行动牌，不可更换角色，如需更换角色请先移除比赛牌组。";
 
   createEffect(() => {
     if (isNew) {
@@ -255,13 +260,42 @@ export default function EditDeck() {
           </div>
         </div>
         <Show when={competition()}>
-          <div class="alert alert-border-warning mb-3">
+          <div class="hidden alert alert-border-warning mb-3 md:block">
             <p>
-              <i class="i-mdi-lock" />{" "}
-              {fullyLocked()
-                ? "场次进行中：比赛牌组已完全锁定，仅可导出分享码。"
-                : "牌组收集阶段：已经选中的比赛牌组，仅可调整角色顺序和变更行动牌，不可更换角色，如需更换角色请先移除比赛牌组。"}
+              <i class="i-mdi-lock" /> {competitionNotice()}
             </p>
+          </div>
+          <div class="md:hidden">
+            <Show
+              when={competitionNoticeOpen()}
+              fallback={
+                <button
+                  type="button"
+                  class="fixed left-[calc(1.5rem+var(--root-padding-right))] top-[calc(6rem+var(--root-padding-top))] z-210 h-8 w-8 rounded-full bg-red-4 text-xl font-bold text-white shadow-lg"
+                  aria-label="展开比赛牌组提示"
+                  onClick={() => setCompetitionNoticeOpen(true)}
+                >
+                  !
+                </button>
+              }
+            >
+              <div
+                class="fixed inset-0 z-300 flex items-center justify-center bg-black/35 p-5"
+                role="presentation"
+                onClick={() => setCompetitionNoticeOpen(false)}
+              >
+                <div
+                  class="alert alert-border-warning w-full max-w-100 bg-white shadow-xl"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="比赛牌组提示"
+                >
+                  <p>
+                    <i class="i-mdi-lock" /> {competitionNotice()}
+                  </p>
+                </div>
+              </div>
+            </Show>
           </div>
         </Show>
         <Switch>
@@ -274,7 +308,7 @@ export default function EditDeck() {
           </Match>
           <Match when={status().type !== "notLogin"}>
             <DeckBuilder
-              class={`h-[calc(100dvh-9rem)] @3xl:h-auto w-full flex-grow min-h-0`}
+              class={`h-[calc(100dvh-11rem)] @3xl:h-auto w-full flex-grow min-h-0`}
               assetsManager={assetsManager()}
               locale={locale()}
               deck={deckValue()}

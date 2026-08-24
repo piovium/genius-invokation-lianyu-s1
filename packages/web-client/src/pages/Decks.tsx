@@ -128,7 +128,7 @@ export default function Decks() {
   return (
     <Layout>
       <div class="container mx-auto h-full px-2 flex flex-col">
-        <div class="flex flex-row gap-4 justify-between items-center mb-5">
+        <div class="sticky top-0 md:top-[calc(4rem+var(--root-padding-top))] z-10 flex flex-row gap-4 justify-between items-center mb-5 py-2 bg-white">
           <h2 class="text-2xl font-bold">{t("myDecks")}</h2>
           <A class="btn btn-outline-green" href="/decks/new">
             <i class="i-mdi-plus" /> {t("add")}
@@ -157,7 +157,7 @@ export default function Decks() {
                       阶段，比赛牌组已锁定。
                     </p>
                   </Show>
-                  <ul class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] md:gap-3">
+                  <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] md:gap-3">
                     <For each={available()}>
                       {(deckData) => (
                         <DeckBriefInfo
@@ -185,7 +185,7 @@ export default function Decks() {
               </Show>
               <section>
                 <h3 class="text-lg font-bold mb-3">其它牌组</h3>
-                <ul class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] md:gap-3">
+                <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2 md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] md:gap-3">
                   <For
                     each={ordinary()}
                     fallback={
