@@ -71,8 +71,8 @@ export default function Statistics() {
   return (
     <AdminPage title="业务统计">
       <div class="sticky top-0 z-10 bg-white pb-3">
-        <div class="flex flex-wrap gap-2 mb-3">
-          <span class="font-bold mr-2">数据源</span>
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <span class="shrink-0 font-bold">数据源</span>
           <For
             each={
               [
@@ -84,7 +84,7 @@ export default function Statistics() {
           >
             {(item) => (
               <button
-                class="btn data-[active=true]:btn-solid-primary btn-outline"
+                class="btn h-10 data-[active=true]:btn-solid-primary btn-outline"
                 data-active={source() === item.v}
                 onClick={() => setSource(item.v)}
               >
@@ -113,7 +113,7 @@ export default function Statistics() {
         >
           {(item) => (
             <button
-              class="btn btn-outline data-[active=true]:btn-solid-primary"
+              class="btn btn-outline h-10 data-[active=true]:btn-solid-primary"
               data-active={tab() === item.v}
               onClick={() => setTab(item.v)}
             >
