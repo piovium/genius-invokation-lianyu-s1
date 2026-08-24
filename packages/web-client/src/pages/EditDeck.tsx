@@ -65,8 +65,6 @@ export default function EditDeck() {
         (DeckInfo & { competition?: MatchDeck | null }) | undefined
     )?.competition;
   const fullyLocked = () => competition()?.match?.event.phase === "RUNNING";
-  const characterKey = (characters: readonly number[]) =>
-    [...characters].sort((a, b) => a - b).join(":");
 
   createEffect(() => {
     if (isNew) {
@@ -114,14 +112,6 @@ export default function EditDeck() {
   };
 
   const importCode = () => {
-    if (competition()) {
-      alert(
-        fullyLocked()
-          ? "场次进行中，比赛牌组只读。"
-          : "比赛牌组不能通过分享码导入；如需更换角色，请先取消比赛设置。",
-      );
-      return;
-    }
     const input = window.prompt(t("inputShareCode"));
     if (input === null) {
       return;
@@ -152,7 +142,6 @@ export default function EditDeck() {
   };
 
   const saveName = async (newName: string) => {
-    if (fullyLocked()) return false;
     const oldName = deckName();
     const { type } = status();
     if (!isNew) {
@@ -177,7 +166,12 @@ export default function EditDeck() {
   };
 
   const saveDeck = async () => {
-    const deckInfo = { ...deckValue(), name: deckName() };
+    const deck = deckValue();
+    const deckInfo = {
+      name: deckName(),
+      characters: deck.characters,
+      cards: deck.cards,
+    };
     const { type } = status();
     try {
       setUploading(true);
@@ -218,14 +212,9 @@ export default function EditDeck() {
             cancelText={t("cancel")}
             class="text-xl md:text-2xl font-bold "
             onSave={saveName}
-            disable={fullyLocked()}
           />
           <div class="flex flex-row flex-1 gap-1 md:gap-3 text-3.2 md:text-3.5">
-            <button
-              class="btn btn-outline-blue"
-              onClick={importCode}
-              disabled={fullyLocked()}
-            >
+            <button class="btn btn-outline-blue" onClick={importCode}>
               {t("importShareCode")}
             </button>
             <button class="btn btn-outline" onClick={exportCode}>
@@ -271,7 +260,7 @@ export default function EditDeck() {
               <i class="i-mdi-lock" />{" "}
               {fullyLocked()
                 ? "场次进行中：比赛牌组已完全锁定，仅可导出分享码。"
-                : "收集阶段：可调整行动牌和角色顺序，但不可增删角色；更换角色请先取消比赛牌组。"}
+                : "牌组收集阶段：已经选中的比赛牌组，仅可调整角色顺序和变更行动牌，不可更换角色，如需更换角色请先移除比赛牌组。"}
             </p>
           </div>
         </Show>
@@ -289,19 +278,7 @@ export default function EditDeck() {
               assetsManager={assetsManager()}
               locale={locale()}
               deck={deckValue()}
-              onChangeDeck={(v) => {
-                if (fullyLocked()) return;
-                if (
-                  competition() &&
-                  characterKey(v.characters) !==
-                    characterKey(deckValue().characters)
-                ) {
-                  alert("比赛牌组不能增删角色；可以调整现有角色顺序。");
-                  return;
-                }
-                setDeckValue(v);
-                setDirty(true);
-              }}
+              onChangeDeck={(v) => (setDeckValue(v), setDirty(true))}
             />
           </Match>
         </Switch>
