@@ -45,7 +45,6 @@ import type {
   RpcResponse,
   RpcResponsePayloadOf,
 } from "@gi-tcg/typings";
-import { VERSIONS, type Version } from "@gi-tcg/core";
 import { DeckDto } from "../decks/decks.controller";
 import { Public } from "../auth/auth.guard";
 import { validateDto } from "../utils";
@@ -59,7 +58,7 @@ export class CreateRoomDto {
 
   @IsInt()
   @Min(0)
-  @Max(VERSIONS.length - 1)
+  @Max(0)
   @IsOptional()
   gameVersion?: number;
 
