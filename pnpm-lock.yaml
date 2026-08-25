@@ -617,6 +617,9 @@ importers:
       '@gi-tcg/core':
         specifier: workspace:*
         version: link:../core
+      '@gi-tcg/custom-data-loader':
+        specifier: workspace:*
+        version: link:../custom-data-loader
       '@gi-tcg/data':
         specifier: workspace:*
         version: link:../data

@@ -13,14 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { For, Match, Show, Switch, createSignal } from "solid-js";
-import getData from "@gi-tcg/data";
+import { Match, Show, Switch, createSignal } from "solid-js";
 import {
   CURRENT_VERSION,
   GameStateLogEntry,
-  Version,
   deserializeGameStateLog,
-  VERSIONS,
   Deck,
   Game,
   GameState,
@@ -31,8 +28,12 @@ import { IS_BETA, SERVER_HOST, WEB_CLIENT_BASE_PATH } from "@gi-tcg/config";
 import { DeckBuilder } from "@gi-tcg/deck-builder";
 import "@gi-tcg/deck-builder/style.css";
 import "@gi-tcg/state-editor/style.css";
-import { DEFAULT_ASSETS_MANAGER } from "@gi-tcg/assets-manager";
 import { GameStateEditor } from "@gi-tcg/state-editor";
+import {
+  ASSETS_MANAGER,
+  GAME_DATA,
+  GAME_VERSION_BEHAVIOR,
+} from "./game-config";
 
 enum GameMode {
   NotStarted = 0,
@@ -58,8 +59,6 @@ export function App() {
   const [logs, setLogs] = createSignal<GameStateLogEntry[]>();
   const [deck0, setDeck0] = createSignal(INIT_DECK0);
   const [deck1, setDeck1] = createSignal(INIT_DECK1);
-  const [version, setVersion] = createSignal<Version>(CURRENT_VERSION);
-
   const importLog = async () => {
     return new Promise<GameStateLogEntry[]>((resolve, reject) => {
       const input = document.createElement("input");
@@ -76,8 +75,7 @@ export function App() {
           const contents = event.target?.result as string;
           try {
             const logs = JSON.parse(contents);
-            const version = logs.gv;
-            resolve(deserializeGameStateLog(getData(version), logs));
+            resolve(deserializeGameStateLog(GAME_DATA, logs));
           } catch (error) {
             reject(error);
           }
@@ -110,7 +108,7 @@ export function App() {
       return;
     }
     try {
-      const deck = DEFAULT_ASSETS_MANAGER.decode(code);
+      const deck = ASSETS_MANAGER.decode(code);
       setDeckBuilderValue(deck);
     } catch (e) {
       if (e instanceof Error) {
@@ -122,7 +120,7 @@ export function App() {
   const saveDeckBuilderValue = async () => {
     const deck = deckBuilderValue();
     try {
-      const code = DEFAULT_ASSETS_MANAGER.encode(deck);
+      const code = ASSETS_MANAGER.encode(deck);
       await navigator.clipboard.writeText(code);
       alert(`Deck code copied to clipboard: ${code}`);
     } catch (e) {
@@ -137,11 +135,12 @@ export function App() {
     const d0 = deck0();
     const d1 = deck1();
     try {
-      const deck0 = DEFAULT_ASSETS_MANAGER.decode(d0);
-      const deck1 = DEFAULT_ASSETS_MANAGER.decode(d1);
+      const deck0 = ASSETS_MANAGER.decode(d0);
+      const deck1 = ASSETS_MANAGER.decode(d1);
       return Game.createInitialState({
         decks: [deck0, deck1],
-        data: getData(version()),
+        data: GAME_DATA,
+        versionBehavior: GAME_VERSION_BEHAVIOR,
       });
     } catch (e) {
       if (e instanceof Error) {
@@ -188,17 +187,6 @@ export function App() {
                   value={deck1()}
                   onInput={(e) => setDeck1(e.currentTarget.value)}
                 />
-              </div>
-              <div class="config-panel__deck">
-                <label>游戏版本</label>
-                <select
-                  value={version()}
-                  onChange={(e) => setVersion(e.target.value as Version)}
-                >
-                  <For each={VERSIONS}>
-                    {(ver) => <option value={ver}>{ver}</option>}
-                  </For>
-                </select>
               </div>
               <div class="config-panel__description">
                 点击下方按钮开始对局；先手方棋盘会在弹出窗口显示，后手方棋盘在本页面显示。
@@ -335,7 +323,6 @@ export function App() {
             logs={logs()}
             deck0={deck0()}
             deck1={deck1()}
-            version={version()}
           />
         </Match>
         <Match when={mode() === GameMode.Editor}>
@@ -357,6 +344,7 @@ export function App() {
         <Show when={loadDeckBuilder()}>
           <DeckBuilder
             class="deck-builder"
+            assetsManager={ASSETS_MANAGER}
             deck={deckBuilderValue()}
             onChangeDeck={setDeckBuilderValue}
           />
