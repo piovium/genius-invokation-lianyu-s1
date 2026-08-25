@@ -16,9 +16,11 @@
 import { createClient } from "@gi-tcg/web-ui-core";
 import "@gi-tcg/web-ui-core/style.css";
 import { onCleanup, onMount } from "solid-js";
+import { ASSETS_MANAGER } from "./game-config";
 
 export function StandaloneChild() {
   const [uiIo, Chessboard] = createClient(0, {
+    assetsManager: () => ASSETS_MANAGER,
     onGiveUp: () => {
       window.opener?.postMessage({
         giTcg: "1.0",

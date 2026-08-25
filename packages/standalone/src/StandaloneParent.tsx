@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import getData from "@gi-tcg/data";
 import {
   CancellablePlayerIO,
+  CURRENT_VERSION,
   DetailLogEntry,
   Game,
   GameState,
   GameStateLogEntry,
-  Version,
   exposeState,
   serializeGameStateLog,
   setAsyncContext,
@@ -30,14 +29,17 @@ import { createClient, StandaloneChessboard } from "@gi-tcg/web-ui-core";
 import "@gi-tcg/web-ui-core/style.css";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { DetailLogViewer } from "@gi-tcg/detail-log-viewer";
-import { DEFAULT_ASSETS_MANAGER } from "@gi-tcg/assets-manager";
 import mergeErrorCause from "merge-error-cause";
+import {
+  ASSETS_MANAGER,
+  GAME_DATA,
+  GAME_VERSION_BEHAVIOR,
+} from "./game-config";
 
 export interface StandaloneParentProps {
   logs?: GameStateLogEntry[];
   deck0: string;
   deck1: string;
-  version: Version;
 }
 
 const CHILD_WHO = 0;
@@ -45,6 +47,7 @@ const PARENT_WHO = 1;
 
 export function StandaloneParent(props: StandaloneParentProps) {
   const [uiIo, Chessboard] = createClient(1, {
+    assetsManager: () => ASSETS_MANAGER,
     onGiveUp: () => {
       game?.giveUp(PARENT_WHO);
     },
@@ -155,7 +158,7 @@ export function StandaloneParent(props: StandaloneParentProps) {
 
   const exportLog = () => {
     const logs = serializeGameStateLog(stateLog());
-    const blob = new Blob([JSON.stringify({ ...logs, gv: props.version })], {
+    const blob = new Blob([JSON.stringify({ ...logs, gv: CURRENT_VERSION })], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -189,12 +192,12 @@ export function StandaloneParent(props: StandaloneParentProps) {
 
   const createGame = async (state?: GameState) => {
     if (!state) {
-      const deck0 = DEFAULT_ASSETS_MANAGER.decode(props.deck0);
-      const deck1 = DEFAULT_ASSETS_MANAGER.decode(props.deck1);
+      const deck0 = ASSETS_MANAGER.decode(props.deck0);
+      const deck1 = ASSETS_MANAGER.decode(props.deck1);
       state = Game.createInitialState({
         decks: [deck0, deck1],
-        data: getData(props.version),
-        versionBehavior: props.version,
+        data: GAME_DATA,
+        versionBehavior: GAME_VERSION_BEHAVIOR,
       });
     }
     await setAsyncContext(true);
@@ -331,6 +334,7 @@ export function StandaloneParent(props: StandaloneParentProps) {
             <StandaloneChessboard
               class="grayscale"
               who={viewingWho()}
+              assetsManager={ASSETS_MANAGER}
               state={exposeState(viewingWho(), state().state)}
               mutations={[]}
             />
