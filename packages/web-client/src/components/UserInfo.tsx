@@ -50,6 +50,14 @@ export function UserInfo(props: UserInfoProps) {
     const current = status();
     return current.type === "user" && current.role === "ADMIN";
   };
+  const canEditName = () => {
+    if (!props.editable) return false;
+    if (props.type === "guest") return true;
+    const current = status();
+    return (
+      current.type === "user" && current.competitionStatus === "NONE"
+    );
+  };
 
   const saveName = async (newName: string) => {
     if (newName.trim()) {
@@ -109,7 +117,7 @@ export function UserInfo(props: UserInfoProps) {
           <dt class="font-bold text-nowrap">{t("nickname")}</dt>
           <dd class="flex flex-row gap-4 items-center h-8">
             <TextFieldEdit
-              disable={!props.editable}
+              disable={!canEditName()}
               value={props.name || ""}
               saveText={t("save")}
               cancelText={t("cancel")}
