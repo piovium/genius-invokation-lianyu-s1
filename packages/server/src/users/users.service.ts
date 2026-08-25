@@ -3,6 +3,7 @@
 
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../db/prisma.service";
+import { BusinessException } from "../errors";
 import type { UpdateUserInfoDto } from "./users.controller";
 
 export interface UserInfo {
@@ -76,7 +77,23 @@ export class UsersService {
   }
 
   async updateUserInfo(id: number, dto: UpdateUserInfoDto) {
-    await this.prisma.user.update({ where: { id }, data: dto });
+    const { name, ...otherInfo } = dto;
+    if (name !== undefined) {
+      const { count } = await this.prisma.user.updateMany({
+        where: { id, competitionStatus: "NONE" },
+        data: { name },
+      });
+      if (count === 0) {
+        throw new BusinessException(
+          "NICKNAME_LOCKED_AFTER_REGISTRATION",
+          "报名后不可修改昵称",
+          409,
+        );
+      }
+    }
+    if (Object.keys(otherInfo).length > 0) {
+      await this.prisma.user.update({ where: { id }, data: otherInfo });
+    }
     return this.findById(id);
   }
 }
