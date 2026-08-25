@@ -27,6 +27,7 @@ import {
   Match,
   Component,
   createUniqueId,
+  createMemo,
 } from "solid-js";
 import axios, { AxiosError } from "axios";
 import "@gi-tcg/web-ui-core/style.css";
@@ -182,6 +183,14 @@ export default function Room() {
   // Enable opp chessboard & spectator mode
   const [observerMode, setObserverMode] = createSignal(false);
   const [oppPlayerIo, setOppPlayerIo] = createSignal<CancellablePlayerIO>();
+  const isAdmin = () => {
+    const current = status();
+    return current.type === "user" && current.role === "ADMIN";
+  };
+  const canWatchOpp = createMemo(() => {
+    const payload = initialized();
+    return !!payload && !action && (payload.config.watchable || isAdmin());
+  });
 
   const reportStreamError = async (e: Error) => {
     if (e instanceof AxiosError) {
@@ -318,9 +327,6 @@ export default function Room() {
         case "initialized": {
           setInitialized(payload);
           initializeClient(payload);
-          if (payload?.config?.watchable && allowWatchOpp()) {
-            setObserverMode(true);
-          }
           break;
         }
         case "notification": {
@@ -359,7 +365,6 @@ export default function Room() {
   );
 
   const getOppPlayerId = () => initialized()?.oppPlayerInfo.id;
-  const allowWatchOpp = () => !action;
 
   const [fetchOppNotification, abortOppNotification] = createReconnectSse(
     () => `rooms/${id}/players/${getOppPlayerId()}/notification`,
@@ -401,6 +406,12 @@ export default function Room() {
     },
     reportStreamError,
   );
+
+  createEffect(() => {
+    if (canWatchOpp()) {
+      setObserverMode(true);
+    }
+  });
 
   createEffect(() => {
     if (observerMode()) {
@@ -482,20 +493,18 @@ export default function Room() {
                   <i class="i-mdi-delete" />
                 </button>
               </Show>
-              <Show when={initialized()?.config.watchable}>
-                <Show when={allowWatchOpp()}>
-                  <button
-                    class="btn btn-outline-primary"
-                    onClick={() => setObserverMode((v) => !v)}
-                  >
-                    <i class="i-mdi-video-switch-outline" />
-                    <span>
-                      {t(
-                        `enter${observerMode() ? "PlayerView" : "ObserverMode"}`,
-                      )}
-                    </span>
-                  </button>
-                </Show>
+              <Show when={canWatchOpp()}>
+                <button
+                  class="btn btn-outline-primary"
+                  onClick={() => setObserverMode((v) => !v)}
+                >
+                  <i class="i-mdi-video-switch-outline" />
+                  <span>
+                    {t(
+                      `enter${observerMode() ? "PlayerView" : "ObserverMode"}`,
+                    )}
+                  </span>
+                </button>
               </Show>
             </div>
             <div>
