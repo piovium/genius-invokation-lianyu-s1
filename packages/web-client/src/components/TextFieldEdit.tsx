@@ -65,12 +65,14 @@ export function TextFieldEdit(props: TextFieldEditProps) {
           <h2 class={`min-w-0 overflow-hidden whitespace-nowrap text-ellipsis flex-shrink-0 ${props.class}`}>
             {props.value}
           </h2>
-          <button
-            class="btn btn-ghost h-8 w-8 p-1"
-            onClick={() => setEditing(true)}
-          >
-            <i class="i-mdi-square-edit-outline h-6 w-6" />
-          </button>
+          <Show when={!props.disable}>
+            <button
+              class="btn btn-ghost h-8 w-8 p-1"
+              onClick={() => setEditing(true)}
+            >
+              <i class="i-mdi-square-edit-outline h-6 w-6" />
+            </button>
+          </Show>
         </div>
       }
     >
