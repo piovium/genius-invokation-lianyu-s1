@@ -34,7 +34,7 @@ import { AuthRateLimitService } from "./auth-rate-limit.service";
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: "12h" },
+      signOptions: { expiresIn: "21d" },
     }),
   ],
   providers: [
