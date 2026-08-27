@@ -251,6 +251,7 @@ export default function Room() {
     }
     setCurrentMyTimer(null);
     try {
+      trackRpcInterval("myResponse");
       const reply = axios.post(
         `rooms/${id}/players/${playerId}/actionResponse`,
         {
@@ -284,6 +285,55 @@ export default function Room() {
   const [currentOppTimer, setCurrentOppTimer] = createSignal<RpcTimer | null>(
     null,
   );
+
+  // Temporary RPC interval instrumentation; keep it local for easy removal.
+  const [lastRpcInterval, setLastRpcInterval] = createSignal<number>();
+  let myRpcActive = false;
+  let oppRpcActive = false;
+  let rpcIntervalStartedAt: number | null = null;
+  const trackRpcInterval = (
+    event: "myStart" | "myResponse" | "myEnd" | "oppStart" | "oppEnd" | "reset",
+  ) => {
+    if (event === "reset") {
+      myRpcActive = false;
+      oppRpcActive = false;
+      rpcIntervalStartedAt = null;
+      return;
+    }
+    if (event === "myResponse") {
+      rpcIntervalStartedAt =
+        myRpcActive && !oppRpcActive ? performance.now() : null;
+      return;
+    }
+
+    const isMyEvent = event === "myStart" || event === "myEnd";
+    const isStart = event === "myStart" || event === "oppStart";
+    const wasActive = isMyEvent ? myRpcActive : oppRpcActive;
+    if (wasActive === isStart) {
+      return;
+    }
+
+    const hadActiveRpc = myRpcActive || oppRpcActive;
+    if (isMyEvent) {
+      myRpcActive = isStart;
+    } else {
+      oppRpcActive = isStart;
+    }
+
+    if (isStart) {
+      if (!hadActiveRpc && rpcIntervalStartedAt !== null) {
+        setLastRpcInterval(
+          Math.round(performance.now() - rpcIntervalStartedAt),
+        );
+      }
+      rpcIntervalStartedAt = null;
+    } else if (!myRpcActive && !oppRpcActive && !isMyEvent) {
+      rpcIntervalStartedAt = performance.now();
+    } else if (myRpcActive || oppRpcActive) {
+      rpcIntervalStartedAt = null;
+    }
+  };
+
   let lastRpcId: number | null = null;
   let countDownTimerIntervalId: number | null = null;
   const countDownTimer = () => {
@@ -325,6 +375,7 @@ export default function Room() {
       setLoading(false);
       switch (payload.type) {
         case "initialized": {
+          trackRpcInterval("reset");
           setInitialized(payload);
           initializeClient(payload);
           break;
@@ -335,14 +386,17 @@ export default function Room() {
           break;
         }
         case "oppRpc": {
+          trackRpcInterval(payload.oppTimer ? "oppStart" : "oppEnd");
           setCurrentOppTimer(payload.oppTimer ?? null);
           break;
         }
         case "rpc": {
           const rpc: ActionRequestPayload | null = payload.data;
           if (rpc) {
+            trackRpcInterval("myStart");
             onActionRequested(rpc);
           } else {
+            trackRpcInterval("myEnd");
             // 观战方收到 RPC 状态变化时取消 RPC（玩家已完成 RPC 无需取消）
             if (!action) {
               playerIo()?.cancelRpc();
@@ -525,6 +579,20 @@ export default function Room() {
                         ? t("youAreFirst")
                         : t("youAreSecond")}
                     </span>
+                    <Show when={lastRpcInterval()}>
+                      {(t) => (
+                        <span
+                          class="ml-3 tabular-nums"
+                          classList={{
+                            "text-green-5": t() < 200,
+                            "text-yellow-5": t() >= 200 && t() < 500,
+                            "text-red-5": t() >= 500,
+                          }}
+                        >
+                          {`(延迟: ${t()}ms)`}
+                        </span>
+                      )}
+                    </Show>
                   </div>
                 )}
               </Show>
