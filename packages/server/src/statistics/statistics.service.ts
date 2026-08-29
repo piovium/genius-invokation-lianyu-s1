@@ -1,11 +1,21 @@
 // Copyright (C) 2024-2026 Guyutongxue
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
+import type { Prisma } from "#prisma/client";
 import { PrismaService } from "../db/prisma.service";
 import { characterKey } from "../decks/decks.service";
 
-type Source = "all" | "tournament" | "casual";
+export interface StatisticsFilters {
+  createdAtFrom?: string;
+  createdAtTo?: string;
+  sources: ("tournament" | "casual")[];
+  eventIds?: number[];
+  roundCounts?: number[];
+  includeSurrender: boolean;
+  includeAdmin: boolean;
+}
+
 interface DeckSnapshot {
   characters: number[];
   cards: number[];
@@ -22,33 +32,96 @@ interface Aggregate {
 export class StatisticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async samples(source: Source) {
+  private date(value: string, end: boolean) {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.toISOString().slice(0, 10) !== value
+    ) {
+      throw new BadRequestException(`Invalid date: ${value}`);
+    }
+    if (end) date.setUTCDate(date.getUTCDate() + 1);
+    return date;
+  }
+
+  private async samples(filters: StatisticsFilters) {
+    const createdAt = {
+      ...(filters.createdAtFrom
+        ? { gte: this.date(filters.createdAtFrom, false) }
+        : {}),
+      ...(filters.createdAtTo
+        ? { lt: this.date(filters.createdAtTo, true) }
+        : {}),
+    };
+    if (createdAt.gte && createdAt.lt && createdAt.gte >= createdAt.lt) {
+      throw new BadRequestException(
+        "createdAtFrom must not be after createdAtTo",
+      );
+    }
+
+    const sources: Prisma.GameWhereInput[] = [];
+    if (filters.sources.includes("casual")) sources.push({ matchId: null });
+    if (filters.eventIds?.length) {
+      sources.push({ match: { eventId: { in: filters.eventIds } } });
+    } else if (filters.sources.includes("tournament")) {
+      sources.push({ matchId: { not: null } });
+    }
+    const endings: Prisma.GameWhereInput[] = [
+      {
+        endReason: "NORMAL",
+        ...(filters.roundCounts?.length
+          ? { roundCount: { in: filters.roundCounts } }
+          : {}),
+      },
+    ];
+    if (filters.includeSurrender) endings.push({ endReason: "SURRENDER" });
+    if (filters.includeAdmin) endings.push({ endReason: "ADMIN" });
+
     const games = await this.prisma.game.findMany({
       where: {
         status: "FINISHED",
         countForStats: true,
-        matchId:
-          source === "tournament"
-            ? { not: null }
-            : source === "casual"
-              ? null
-              : undefined,
+        ...(Object.keys(createdAt).length ? { createdAt } : {}),
+        AND: [{ OR: sources }, { OR: endings }],
       },
-      include: { players: true },
+      select: {
+        winnerWho: true,
+        manualWinnerWho: true,
+        endReason: true,
+        createdAt: true,
+        players: {
+          select: {
+            who: true,
+            userId: true,
+            deckJson: true,
+            characterKey: true,
+          },
+        },
+      },
       orderBy: { createdAt: "asc" },
     });
-    return games.filter(
-      (game) =>
-        game.players.length === 2 &&
-        game.players.every((player) => {
-          const deck = player.deckJson as unknown as DeckSnapshot | null;
-          return Array.isArray(deck?.characters) && Array.isArray(deck?.cards);
-        }),
-    );
+    return games
+      .filter(
+        (game) =>
+          game.players.length === 2 &&
+          game.players.every((player) => {
+            const deck = player.deckJson as unknown as DeckSnapshot | null;
+            return (
+              Array.isArray(deck?.characters) && Array.isArray(deck?.cards)
+            );
+          }),
+      )
+      .map((game) => ({
+        ...game,
+        winnerWho:
+          game.endReason === "ADMIN"
+            ? (game.manualWinnerWho ?? game.winnerWho)
+            : game.winnerWho,
+      }));
   }
 
-  async cards(source: Source) {
-    const games = await this.samples(source);
+  async cards(filters: StatisticsFilters) {
+    const games = await this.samples(filters);
     const characters = new Map<string, Aggregate>();
     const actionCards = new Map<string, Aggregate>();
     const combinations = new Map<string, Aggregate>();
@@ -92,7 +165,6 @@ export class StatisticsService {
           (a, b) => b.appearances - a.appearances || a.id.localeCompare(b.id),
         );
     return {
-      source,
       gameCount: games.length,
       denominator,
       characters: serialize(characters),
@@ -101,8 +173,8 @@ export class StatisticsService {
     };
   }
 
-  async users(source: Source) {
-    const games = await this.samples(source);
+  async users(filters: StatisticsFilters) {
+    const games = await this.samples(filters);
     const users = new Map<
       number,
       {
@@ -160,6 +232,14 @@ export class StatisticsService {
         decks: [...item.decks.values()],
       };
     });
+  }
+
+  async options() {
+    const events = await this.prisma.tournamentEvent.findMany({
+      select: { id: true, name: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return { events };
   }
 
   async rankings(eventIds: number[]) {
