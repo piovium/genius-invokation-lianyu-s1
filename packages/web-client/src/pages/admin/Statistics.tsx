@@ -2,6 +2,11 @@ import axios from "axios";
 import { For, Show, createMemo, createResource, createSignal } from "solid-js";
 import { AdminPage } from "./shared";
 import { useI18n } from "../../i18n";
+import {
+  type CombinationDetail,
+  StatisticsCombinationDetail,
+} from "../../components/StatisticsCombinationDetail";
+import { StatisticsUserDetail } from "../../components/StatisticsUserDetail";
 
 type Source = "tournament" | "casual";
 interface StatisticsFilters {
@@ -25,13 +30,16 @@ interface Aggregate {
   awayAppearances?: number;
   awayWins?: number;
   awayWinRate?: number;
+  averageCopies?: number;
+  netCopies?: number;
 }
-interface CardStats {
+interface OverviewStats {
   gameCount: number;
   denominator: number;
   characters: Aggregate[];
   actionCards: Aggregate[];
   combinations: Aggregate[];
+  users: UserStats[];
 }
 interface UserStats {
   id: number;
@@ -40,12 +48,6 @@ interface UserStats {
   games: number;
   wins: number;
   winRate: number;
-  decks: {
-    deck: { characters: number[]; cards: number[] };
-    uses: number;
-    firstUsedAt: string;
-    lastUsedAt: string;
-  }[];
 }
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 const defaultFilters = (): StatisticsFilters => ({
@@ -78,22 +80,35 @@ export default function Statistics() {
   const [tab, setTab] = createSignal<
     "characters" | "actionCards" | "combinations" | "users"
   >("characters");
+  const [selectedCombination, setSelectedCombination] = createSignal<
+    string | null
+  >(null);
+  const [selectedUser, setSelectedUser] = createSignal<number | null>(null);
   const [options] = createResource(() =>
     axios
       .get<StatisticsOptions>("admin/statistics/options")
       .then((response) => response.data),
   );
-  const [cards] = createResource(filters, (value) =>
+  const [overview] = createResource(filters, (value) =>
     axios
-      .get<CardStats>("admin/statistics/cards", { params: queryParams(value) })
-      .then((r) => r.data),
-  );
-  const [users] = createResource(filters, (value) =>
-    axios
-      .get<UserStats[]>("admin/statistics/users", {
+      .get<OverviewStats>("admin/statistics/overview", {
         params: queryParams(value),
       })
       .then((r) => r.data),
+  );
+  const detailSource = createMemo(() => {
+    const characterKey = selectedCombination();
+    return characterKey
+      ? { characterKey, filters: copyFilters(filters()) }
+      : undefined;
+  });
+  const [detail] = createResource(detailSource, ({ characterKey, filters }) =>
+    axios
+      .get<CombinationDetail>(
+        `admin/statistics/combinations/${encodeURIComponent(characterKey)}`,
+        { params: queryParams(filters) },
+      )
+      .then((response) => response.data),
   );
   const invalidDateRange = createMemo(
     () =>
@@ -149,10 +164,10 @@ export default function Statistics() {
     }));
   const rows = () =>
     tab() === "characters"
-      ? cards()?.characters
+      ? overview()?.characters
       : tab() === "actionCards"
-        ? cards()?.actionCards
-        : cards()?.combinations;
+        ? overview()?.actionCards
+        : overview()?.combinations;
   const name = (id: string) =>
     id.includes(":")
       ? id
@@ -167,9 +182,9 @@ export default function Statistics() {
         <div class="rounded-lg b b-gray-2 bg-white p-3 mb-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <p class="text-sm">
-              <Show when={!cards.loading} fallback="正在查询统计样本…">
-                有效样本 <b>{cards()?.gameCount ?? 0}</b> 局，出场率分母{" "}
-                <b>{cards()?.denominator ?? 0}</b>
+              <Show when={!overview.loading} fallback="正在查询统计样本…">
+                有效样本 <b>{overview()?.gameCount ?? 0}</b> 局，出场率分母{" "}
+                <b>{overview()?.denominator ?? 0}</b>
               </Show>
             </p>
             <button
@@ -422,106 +437,156 @@ export default function Statistics() {
             <button
               class="btn btn-outline h-10 data-[active=true]:btn-solid-primary"
               data-active={tab() === item.v}
-              onClick={() => setTab(item.v)}
+              onClick={() => {
+                setTab(item.v);
+                setSelectedCombination(null);
+                setSelectedUser(null);
+              }}
             >
               {item.t}
             </button>
           )}
         </For>
       </div>
-      <Show
-        when={tab() !== "users"}
-        fallback={
+      <Show when={!selectedCombination() && !selectedUser()}>
+        <Show
+          when={tab() !== "users"}
+          fallback={
+            <div class="overflow-x-auto table-root">
+              <table class="table w-full">
+                <thead class="table-header">
+                  <tr class="table-row">
+                    <th class="table-head">用户</th>
+                    <th class="table-head">对局</th>
+                    <th class="table-head">胜场</th>
+                    <th class="table-head">胜率</th>
+                  </tr>
+                </thead>
+                <tbody class="table-body">
+                  <For each={overview()?.users}>
+                    {(user) => (
+                      <tr
+                        class="table-row cursor-pointer hover:bg-gray-1"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedUser(user.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedUser(user.id);
+                          }
+                        }}
+                      >
+                        <td class="table-cell">
+                          <b>{user.name}</b>
+                          <br />
+                          <small>{user.qq}</small>
+                        </td>
+                        <td class="table-cell">{user.games}</td>
+                        <td class="table-cell">{user.wins}</td>
+                        <td class="table-cell">{pct(user.winRate)}</td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          }
+        >
           <div class="overflow-x-auto table-root">
             <table class="table w-full">
               <thead class="table-header">
                 <tr class="table-row">
-                  <th class="table-head">用户</th>
-                  <th class="table-head">对局</th>
+                  <th class="table-head">卡牌 / 组合</th>
+                  <th class="table-head">出场数</th>
+                  <th class="table-head">出场率</th>
                   <th class="table-head">胜场</th>
                   <th class="table-head">胜率</th>
-                  <th class="table-head">使用牌组</th>
+                  <Show when={tab() === "actionCards"}>
+                    <th class="table-head">平均携带</th>
+                    <th class="table-head">净携带</th>
+                  </Show>
+                  <Show when={tab() === "combinations"}>
+                    <th class="table-head">外战场数</th>
+                    <th class="table-head">外战胜率</th>
+                  </Show>
                 </tr>
               </thead>
               <tbody class="table-body">
-                <For each={users()}>
-                  {(user) => (
-                    <tr class="table-row">
+                <For each={rows()}>
+                  {(row) => (
+                    <tr
+                      class={`table-row ${
+                        tab() === "combinations"
+                          ? "cursor-pointer hover:bg-gray-1"
+                          : ""
+                      }`}
+                      role={tab() === "combinations" ? "button" : undefined}
+                      tabIndex={tab() === "combinations" ? 0 : undefined}
+                      onClick={() => {
+                        if (tab() === "combinations") {
+                          setSelectedCombination(row.id);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (
+                          tab() === "combinations" &&
+                          (event.key === "Enter" || event.key === " ")
+                        ) {
+                          event.preventDefault();
+                          setSelectedCombination(row.id);
+                        }
+                      }}
+                    >
                       <td class="table-cell">
-                        <b>{user.name}</b>
+                        <b>{name(row.id)}</b>
                         <br />
-                        <small>{user.qq}</small>
+                        <small>{row.id}</small>
                       </td>
-                      <td class="table-cell">{user.games}</td>
-                      <td class="table-cell">{user.wins}</td>
-                      <td class="table-cell">{pct(user.winRate)}</td>
-                      <td class="table-cell">
-                        <details>
-                          <summary class="cursor-pointer">
-                            {user.decks.length} 套
-                          </summary>
-                          <ul class="mt-2">
-                            <For each={user.decks}>
-                              {(deck) => (
-                                <li class="mb-1">
-                                  {deck.deck.characters
-                                    .map((id) =>
-                                      assetsManager().getNameSync(id),
-                                    )
-                                    .join(" / ")}{" "}
-                                  · {deck.uses} 次
-                                </li>
-                              )}
-                            </For>
-                          </ul>
-                        </details>
-                      </td>
+                      <td class="table-cell">{row.appearances}</td>
+                      <td class="table-cell">{pct(row.appearanceRate)}</td>
+                      <td class="table-cell">{row.wins}</td>
+                      <td class="table-cell">{pct(row.winRate)}</td>
+                      <Show when={tab() === "actionCards"}>
+                        <td class="table-cell">
+                          {(row.averageCopies ?? 0).toFixed(2)}
+                        </td>
+                        <td class="table-cell">
+                          {(row.netCopies ?? 0).toFixed(2)}
+                        </td>
+                      </Show>
+                      <Show when={tab() === "combinations"}>
+                        <td class="table-cell">{row.awayAppearances ?? 0}</td>
+                        <td class="table-cell">{pct(row.awayWinRate ?? 0)}</td>
+                      </Show>
                     </tr>
                   )}
                 </For>
               </tbody>
             </table>
           </div>
-        }
-      >
-        <div class="overflow-x-auto table-root">
-          <table class="table w-full">
-            <thead class="table-header">
-              <tr class="table-row">
-                <th class="table-head">卡牌 / 组合</th>
-                <th class="table-head">出场数</th>
-                <th class="table-head">出场率</th>
-                <th class="table-head">胜场</th>
-                <th class="table-head">胜率</th>
-                <Show when={tab() === "combinations"}>
-                  <th class="table-head">外战场数</th>
-                  <th class="table-head">外战胜率</th>
-                </Show>
-              </tr>
-            </thead>
-            <tbody class="table-body">
-              <For each={rows()}>
-                {(row) => (
-                  <tr class="table-row">
-                    <td class="table-cell">
-                      <b>{name(row.id)}</b>
-                      <br />
-                      <small>{row.id}</small>
-                    </td>
-                    <td class="table-cell">{row.appearances}</td>
-                    <td class="table-cell">{pct(row.appearanceRate)}</td>
-                    <td class="table-cell">{row.wins}</td>
-                    <td class="table-cell">{pct(row.winRate)}</td>
-                    <Show when={tab() === "combinations"}>
-                      <td class="table-cell">{row.awayAppearances ?? 0}</td>
-                      <td class="table-cell">{pct(row.awayWinRate ?? 0)}</td>
-                    </Show>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-        </div>
+        </Show>
+      </Show>
+      <Show when={selectedCombination()}>
+        {(characterKey) => (
+          <StatisticsCombinationDetail
+            characterKey={characterKey()}
+            detail={detail()}
+            loading={detail.loading}
+            name={name}
+            onBack={() => setSelectedCombination(null)}
+          />
+        )}
+      </Show>
+      <Show when={selectedUser()}>
+        {(userId) => (
+          <StatisticsUserDetail
+            userId={userId()}
+            params={queryParams(filters())}
+            name={name}
+            onBack={() => setSelectedUser(null)}
+          />
+        )}
       </Show>
     </AdminPage>
   );

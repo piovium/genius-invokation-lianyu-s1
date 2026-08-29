@@ -1,7 +1,16 @@
 // Copyright (C) 2024-2026 Guyutongxue
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { Transform, type TransformFnParams } from "class-transformer";
 import {
   ArrayMaxSize,
@@ -42,6 +51,12 @@ function booleanValue({ value }: TransformFnParams) {
   if (value === true || value === "true") return true;
   if (value === false || value === "false") return false;
   return value;
+}
+
+function numberValue({ value }: TransformFnParams) {
+  return typeof value === "string" && value.trim() !== ""
+    ? Number(value)
+    : value;
 }
 
 export class StatisticsQueryDto {
@@ -88,19 +103,45 @@ export class StatisticsQueryDto {
   includeAdmin = true;
 }
 
+export class StatisticsRecordsQueryDto extends StatisticsQueryDto {
+  @IsInt()
+  @Min(0)
+  @Transform(numberValue)
+  skip = 0;
+}
+
 @UseGuards(AdminGuard)
 @Controller("admin")
 export class StatisticsController {
   constructor(private readonly statistics: StatisticsService) {}
 
-  @Get("statistics/cards")
-  cards(@Query() query: StatisticsQueryDto) {
-    return this.statistics.cards(query);
+  @Get("statistics/overview")
+  overview(@Query() query: StatisticsQueryDto) {
+    return this.statistics.overview(query);
   }
 
-  @Get("statistics/users")
-  users(@Query() query: StatisticsQueryDto) {
-    return this.statistics.users(query);
+  @Get("statistics/combinations/:characterKey")
+  combination(
+    @Param("characterKey") characterKey: string,
+    @Query() query: StatisticsQueryDto,
+  ) {
+    return this.statistics.combination(characterKey, query);
+  }
+
+  @Get("statistics/users/:userId/games")
+  userGames(
+    @Param("userId", ParseIntPipe) userId: number,
+    @Query() query: StatisticsRecordsQueryDto,
+  ) {
+    return this.statistics.userGames(userId, query, query.skip);
+  }
+
+  @Get("statistics/users/:userId")
+  user(
+    @Param("userId", ParseIntPipe) userId: number,
+    @Query() query: StatisticsQueryDto,
+  ) {
+    return this.statistics.user(userId, query);
   }
 
   @Get("statistics/options")
