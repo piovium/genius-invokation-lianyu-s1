@@ -9,6 +9,7 @@ import {
 import { StatisticsUserDetail } from "../../components/StatisticsUserDetail";
 import { StatisticsCharacterCard } from "../../components/StatisticsCharacterCard";
 import { StatisticsActionCard } from "../../components/StatisticsActionCard";
+import { StatisticsUserCard } from "../../components/StatisticsUserCard";
 
 type Source = "tournament" | "casual";
 interface StatisticsFilters {
@@ -49,6 +50,7 @@ interface UserStats {
   name: string;
   games: number;
   wins: number;
+  netWins: number;
   winRate: number;
 }
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
@@ -454,44 +456,21 @@ export default function Statistics() {
         <Show
           when={tab() !== "users"}
           fallback={
-            <div class="overflow-x-auto table-root">
-              <table class="table w-full">
-                <thead class="table-header">
-                  <tr class="table-row">
-                    <th class="table-head">用户</th>
-                    <th class="table-head">对局</th>
-                    <th class="table-head">胜场</th>
-                    <th class="table-head">胜率</th>
-                  </tr>
-                </thead>
-                <tbody class="table-body">
-                  <For each={overview()?.users}>
-                    {(user) => (
-                      <tr
-                        class="table-row cursor-pointer hover:bg-gray-1"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedUser(user.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setSelectedUser(user.id);
-                          }
-                        }}
-                      >
-                        <td class="table-cell">
-                          <b>{user.name}</b>
-                          <br />
-                          <small>{user.qq}</small>
-                        </td>
-                        <td class="table-cell">{user.games}</td>
-                        <td class="table-cell">{user.wins}</td>
-                        <td class="table-cell">{pct(user.winRate)}</td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <For each={overview()?.users}>
+                {(user) => (
+                  <StatisticsUserCard
+                    id={user.id}
+                    qq={user.qq}
+                    name={user.name}
+                    games={user.games}
+                    wins={user.wins}
+                    netWins={user.netWins}
+                    winRate={user.winRate}
+                    onClick={() => setSelectedUser(user.id)}
+                  />
+                )}
+              </For>
             </div>
           }
         >
