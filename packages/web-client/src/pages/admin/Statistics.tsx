@@ -536,7 +536,6 @@ export default function Statistics() {
           <StatisticsUserDetail
             userId={userId()}
             params={queryParams(filters())}
-            name={name}
             onBack={() => setSelectedUser(null)}
           />
         )}
