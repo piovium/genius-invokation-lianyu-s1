@@ -360,6 +360,41 @@ describe("StatisticsService filters", () => {
     });
   });
 
+  it("returns all combination matchups and action cards", async () => {
+    const actionCards = Array.from({ length: 45 }, (_, index) => 1000 + index);
+    const games = Array.from({ length: 12 }, (_, index) => ({
+      winnerWho: 0,
+      manualWinnerWho: null,
+      endReason: "NORMAL",
+      createdAt: new Date(),
+      players: [
+        {
+          who: 0,
+          userId: null,
+          deckJson: { characters: [1, 2, 3], cards: actionCards },
+          characterKey: "1:2:3",
+        },
+        {
+          who: 1,
+          userId: null,
+          deckJson: {
+            characters: [100 + index * 3, 101 + index * 3, 102 + index * 3],
+            cards: [2000],
+          },
+          characterKey: `${100 + index * 3}:${101 + index * 3}:${102 + index * 3}`,
+        },
+      ],
+    }));
+    const service = new StatisticsService({
+      game: { findMany: vi.fn().mockResolvedValue(games) },
+    } as never);
+
+    const result = await service.combination("1:2:3", defaults());
+
+    expect(result.matchups.advantages).toHaveLength(12);
+    expect(result.actionCards).toHaveLength(45);
+  });
+
   it("compares a user's combinations with the filtered overview", async () => {
     const player = (
       who: number,

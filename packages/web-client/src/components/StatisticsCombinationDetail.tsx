@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 
 interface Matchup {
   id: string;
@@ -126,6 +126,41 @@ function MatchupTable(props: {
   );
 }
 
+function Pagination(props: {
+  page: number;
+  count: number;
+  onChange: (page: number) => void;
+}) {
+  const pageCount = () => Math.ceil(props.count / 10);
+  return (
+    <Show when={pageCount() > 1}>
+      <div class="mt-3 flex items-center justify-end gap-3">
+        <button
+          type="button"
+          class="btn btn-outline h-9"
+          disabled={props.page === 0}
+          onClick={() => props.onChange(Math.max(0, props.page - 1))}
+        >
+          <i class="i-mdi-chevron-left" aria-hidden="true" />
+          上一页
+        </button>
+        <span class="text-sm">
+          第 {props.page + 1} / {pageCount()} 页
+        </span>
+        <button
+          type="button"
+          class="btn btn-outline h-9"
+          disabled={props.page + 1 >= pageCount()}
+          onClick={() => props.onChange(props.page + 1)}
+        >
+          下一页
+          <i class="i-mdi-chevron-right" aria-hidden="true" />
+        </button>
+      </div>
+    </Show>
+  );
+}
+
 export function StatisticsCombinationDetail(props: {
   characterKey: string;
   detail: CombinationDetail | undefined;
@@ -133,6 +168,19 @@ export function StatisticsCombinationDetail(props: {
   name: (id: string) => string | undefined;
   onBack: () => void;
 }) {
+  const [advantagePage, setAdvantagePage] = createSignal(0);
+  const [disadvantagePage, setDisadvantagePage] = createSignal(0);
+  const [actionCardPage, setActionCardPage] = createSignal(0);
+  createEffect(() => {
+    props.characterKey;
+    props.detail;
+    setAdvantagePage(0);
+    setDisadvantagePage(0);
+    setActionCardPage(0);
+  });
+  const page = <T,>(items: readonly T[], value: number) =>
+    items.slice(value * 10, value * 10 + 10);
+
   return (
     <>
       <div class="mb-4 flex items-center gap-3">
@@ -245,15 +293,28 @@ export function StatisticsCombinationDetail(props: {
                   <div>
                     <h5 class="font-bold text-success mb-2">优势对局</h5>
                     <MatchupTable
-                      rows={result().matchups.advantages}
+                      rows={page(result().matchups.advantages, advantagePage())}
                       name={props.name}
+                    />
+                    <Pagination
+                      page={advantagePage()}
+                      count={result().matchups.advantages.length}
+                      onChange={setAdvantagePage}
                     />
                   </div>
                   <div>
                     <h5 class="font-bold text-error mb-2">劣势对局</h5>
                     <MatchupTable
-                      rows={result().matchups.disadvantages}
+                      rows={page(
+                        result().matchups.disadvantages,
+                        disadvantagePage(),
+                      )}
                       name={props.name}
+                    />
+                    <Pagination
+                      page={disadvantagePage()}
+                      count={result().matchups.disadvantages.length}
+                      onChange={setDisadvantagePage}
                     />
                   </div>
                 </div>
@@ -328,7 +389,7 @@ export function StatisticsCombinationDetail(props: {
                       </tr>
                     </thead>
                     <tbody class="table-body">
-                      <For each={result().actionCards}>
+                      <For each={page(result().actionCards, actionCardPage())}>
                         {(item) => (
                           <tr class="table-row">
                             <td class="table-cell">
@@ -367,6 +428,11 @@ export function StatisticsCombinationDetail(props: {
                     </tbody>
                   </table>
                 </div>
+                <Pagination
+                  page={actionCardPage()}
+                  count={result().actionCards.length}
+                  onChange={setActionCardPage}
+                />
               </section>
             </>
           )}

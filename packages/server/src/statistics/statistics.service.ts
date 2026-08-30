@@ -365,8 +365,7 @@ export class StatisticsService {
             b.appearances - a.appearances ||
             (b.winRate ?? 0) - (a.winRate ?? 0) ||
             a.id.localeCompare(b.id),
-        )
-        .slice(0, 8);
+        );
 
     return {
       characterKey: selectedKey,
@@ -415,8 +414,7 @@ export class StatisticsService {
             (b.averageCopies ?? 0) - (a.averageCopies ?? 0) ||
             b.appearances - a.appearances ||
             a.id.localeCompare(b.id),
-        )
-        .slice(0, 40),
+        ),
     };
   }
 
