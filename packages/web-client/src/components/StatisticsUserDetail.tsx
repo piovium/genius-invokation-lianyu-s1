@@ -13,7 +13,12 @@ import { formatRate, StatisticsRateWithDelta } from "./StatisticsValue";
 
 interface UserDetail {
   user: { id: number; qq: string; name: string };
-  overview: { games: number; wins: number; winRate: number | null };
+  overview: {
+    games: number;
+    wins: number;
+    netWins: number;
+    winRate: number | null;
+  };
   combinations: {
     id: string;
     appearances: number;
@@ -133,7 +138,7 @@ export function StatisticsUserDetail(props: {
           class="btn btn-ghost-primary h-9 w-9 p-0"
           title="返回用户列表"
           aria-label="返回用户列表"
-          onClick={props.onBack}
+          onClick={() => props.onBack()}
         >
           <i class="i-mdi-arrow-left" aria-hidden="true" />
         </button>
@@ -155,6 +160,7 @@ export function StatisticsUserDetail(props: {
                       <tr class="table-row">
                         <th class="table-head">对局</th>
                         <th class="table-head">胜场</th>
+                        <th class="table-head">净胜场</th>
                         <th class="table-head">胜率</th>
                       </tr>
                     </thead>
@@ -162,6 +168,7 @@ export function StatisticsUserDetail(props: {
                       <tr class="table-row">
                         <td class="table-cell">{data().overview.games}</td>
                         <td class="table-cell">{data().overview.wins}</td>
+                        <td class="table-cell">{data().overview.netWins}</td>
                         <td class="table-cell">
                           {formatRate(data().overview.winRate)}
                         </td>
