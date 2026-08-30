@@ -10,6 +10,11 @@ import {
 import { errorMessage } from "../api/errors";
 import { useI18n } from "../i18n";
 import { formatRate, StatisticsRateWithDelta } from "./StatisticsValue";
+import {
+  StatisticsCombinationCardContent,
+  statisticsCombinationCardClass,
+} from "./StatisticsCombinationCard";
+import { CombinationTag } from "./StatisticsCombinationDetail";
 
 interface UserDetail {
   user: { id: number; qq: string; name: string };
@@ -65,7 +70,6 @@ const endReasonLabel = {
 export function StatisticsUserDetail(props: {
   userId: number;
   params: FilterParams;
-  name: (id: string) => string | undefined;
   onBack: () => void;
 }) {
   const { t } = useI18n();
@@ -100,11 +104,11 @@ export function StatisticsUserDetail(props: {
   });
   const pageCount = () => Math.ceil((records()?.count ?? 0) / 20);
   const combinationPageCount = () =>
-    Math.ceil((detail()?.combinations.length ?? 0) / 10);
+    Math.ceil((detail()?.combinations.length ?? 0) / 12);
   const visibleCombinations = () =>
     detail()?.combinations.slice(
-      combinationPage() * 10,
-      combinationPage() * 10 + 10,
+      combinationPage() * 12,
+      combinationPage() * 12 + 12,
     ) ?? [];
   const result = (record: GameRecord) => {
     if (record.effectiveWinnerWho === null) return "平";
@@ -184,36 +188,31 @@ export function StatisticsUserDetail(props: {
                   when={data().combinations.length}
                   fallback={<p class="text-sm text-gray-5">暂无卡组数据</p>}
                 >
-                  <div class="overflow-x-auto table-root">
-                    <table class="table w-full">
-                      <thead class="table-header">
-                        <tr class="table-row">
-                          <th class="table-head">三角色组合</th>
-                          <th class="table-head">出场数</th>
-                          <th class="table-head">胜率</th>
-                        </tr>
-                      </thead>
-                      <tbody class="table-body">
-                        <For each={visibleCombinations()}>
-                          {(item) => (
-                            <tr class="table-row">
-                              <td class="table-cell">
-                                <b>{props.name(item.id)}</b>
-                                <br />
-                                <small>{item.id}</small>
-                              </td>
-                              <td class="table-cell">{item.appearances}</td>
-                              <td class="table-cell">
-                                <StatisticsRateWithDelta
-                                  value={item.winRate}
-                                  baseline={item.overviewWinRate}
-                                />
-                              </td>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
+                  <div class="grid grid-cols-3 gap-3">
+                    <For each={visibleCombinations()}>
+                      {(item) => (
+                        <article class={statisticsCombinationCardClass}>
+                          <StatisticsCombinationCardContent
+                            id={item.id}
+                            items={[
+                              {
+                                label: "出场数",
+                                value: String(item.appearances),
+                              },
+                              {
+                                label: "胜率",
+                                value: (
+                                  <StatisticsRateWithDelta
+                                    value={item.winRate}
+                                    baseline={item.overviewWinRate}
+                                  />
+                                ),
+                              },
+                            ]}
+                          />
+                        </article>
+                      )}
+                    </For>
                   </div>
                   <Show when={combinationPageCount() > 1}>
                     <div class="mt-3 flex items-center justify-end gap-3">
@@ -315,13 +314,19 @@ export function StatisticsUserDetail(props: {
                                 <Show when={player()} fallback="-">
                                   {(item) => (
                                     <>
-                                      <b>{item().displayName}</b>
-                                      <br />
-                                      <span>
-                                        {props.name(item().characterKey)}
-                                      </span>
-                                      <br />
-                                      <small>{item().characterKey}</small>
+                                      <p class="mb-1 text-xs text-gray-5">
+                                        {item().displayName}
+                                      </p>
+                                      <CombinationTag
+                                        id={item().characterKey}
+                                        variant={
+                                          record.effectiveWinnerWho === null
+                                            ? "position"
+                                            : item().won
+                                              ? "advantage"
+                                              : "disadvantage"
+                                        }
+                                      />
                                     </>
                                   )}
                                 </Show>

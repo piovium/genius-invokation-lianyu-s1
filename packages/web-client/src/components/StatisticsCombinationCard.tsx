@@ -1,4 +1,4 @@
-import { For } from "solid-js";
+import { For, type JSX } from "solid-js";
 import { useI18n } from "../i18n";
 import { formatPercent } from "./StatisticsValue";
 
@@ -13,30 +13,26 @@ export interface StatisticsCombinationCardProps {
   onClick: () => void;
 }
 
-export function StatisticsCombinationCard(
-  props: StatisticsCombinationCardProps,
-) {
+export interface StatisticsCombinationCardItem {
+  label: string;
+  value: JSX.Element;
+}
+
+export const statisticsCombinationCardClass =
+  "w-full rounded-lg b b-gray-2 bg-white p-3 text-left";
+
+export function StatisticsCombinationCardContent(props: {
+  id: string;
+  items: StatisticsCombinationCardItem[];
+}) {
   const { assetsManager } = useI18n();
   const characterIds = () => props.id.split(":").map(Number);
   const name = () =>
     characterIds()
       .map((id) => assetsManager().getNameSync(id) ?? String(id))
       .join(" / ");
-  const items = () => [
-    { label: "出场数", value: String(props.appearances) },
-    { label: "出场率", value: formatPercent(props.appearanceRate) },
-    { label: "胜场", value: String(props.wins) },
-    { label: "胜率", value: formatPercent(props.winRate) },
-    { label: "外战场数", value: String(props.awayAppearances) },
-    { label: "外战胜率", value: formatPercent(props.awayWinRate) },
-  ];
-
   return (
-    <button
-      type="button"
-      class="w-full rounded-lg b b-gray-2 bg-white p-3 text-left hover:bg-gray-1"
-      onClick={props.onClick}
-    >
+    <>
       <div class="flex flex-row justify-center">
         <For each={characterIds()}>
           {(id) => (
@@ -54,7 +50,7 @@ export function StatisticsCombinationCard(
         </h4>
       </div>
       <dl class="grid grid-flow-col grid-rows-2 gap-x-5 gap-y-1 text-sm">
-        <For each={items()}>
+        <For each={props.items}>
           {(item) => (
             <div class="min-w-0 flex items-baseline justify-between gap-2">
               <dt class="whitespace-nowrap text-gray-5">{item.label}</dt>
@@ -65,6 +61,29 @@ export function StatisticsCombinationCard(
           )}
         </For>
       </dl>
+    </>
+  );
+}
+
+export function StatisticsCombinationCard(
+  props: StatisticsCombinationCardProps,
+) {
+  const items = () => [
+    { label: "出场数", value: String(props.appearances) },
+    { label: "出场率", value: formatPercent(props.appearanceRate) },
+    { label: "胜场", value: String(props.wins) },
+    { label: "胜率", value: formatPercent(props.winRate) },
+    { label: "外战场数", value: String(props.awayAppearances) },
+    { label: "外战胜率", value: formatPercent(props.awayWinRate) },
+  ];
+
+  return (
+    <button
+      type="button"
+      class={`${statisticsCombinationCardClass} hover:bg-gray-1`}
+      onClick={props.onClick}
+    >
+      <StatisticsCombinationCardContent id={props.id} items={items()} />
     </button>
   );
 }
