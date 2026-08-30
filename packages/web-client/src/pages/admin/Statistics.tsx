@@ -11,8 +11,13 @@ import { StatisticsCharacterCard } from "../../components/StatisticsCharacterCar
 import { StatisticsActionCard } from "../../components/StatisticsActionCard";
 import { StatisticsUserCard } from "../../components/StatisticsUserCard";
 import { StatisticsCombinationCard } from "../../components/StatisticsCombinationCard";
+import { StatisticsListToolbar } from "../../components/StatisticsListToolbar";
 
 type Source = "tournament" | "casual";
+type Tab = "characters" | "actionCards" | "combinations" | "users";
+type AggregateSortField = Exclude<keyof Aggregate, "id">;
+type UserSortField = "games" | "wins" | "netWins" | "winRate";
+type SortField = AggregateSortField | UserSortField;
 interface StatisticsFilters {
   createdAtFrom?: string;
   createdAtTo?: string;
@@ -54,6 +59,42 @@ interface UserStats {
   netWins: number;
   winRate: number;
 }
+const sortOptions = {
+  characters: [
+    { value: "appearances", label: "出场数" },
+    { value: "appearanceRate", label: "出场率" },
+    { value: "wins", label: "胜场" },
+    { value: "winRate", label: "胜率" },
+  ],
+  actionCards: [
+    { value: "appearances", label: "出场数" },
+    { value: "appearanceRate", label: "出场率" },
+    { value: "wins", label: "胜场" },
+    { value: "winRate", label: "胜率" },
+    { value: "averageCopies", label: "平均携带" },
+    { value: "netCopies", label: "净携带" },
+  ],
+  combinations: [
+    { value: "appearances", label: "出场数" },
+    { value: "appearanceRate", label: "出场率" },
+    { value: "wins", label: "胜场" },
+    { value: "winRate", label: "胜率" },
+    { value: "awayAppearances", label: "外战场数" },
+    { value: "awayWinRate", label: "外战胜率" },
+  ],
+  users: [
+    { value: "games", label: "对局" },
+    { value: "wins", label: "胜场" },
+    { value: "netWins", label: "净胜场" },
+    { value: "winRate", label: "胜率" },
+  ],
+} as const;
+const searchPlaceholders: Record<Tab, string> = {
+  characters: "搜索角色名称或 ID",
+  actionCards: "搜索行动牌名称或 ID",
+  combinations: "搜索组合中包含的角色名称或 ID",
+  users: "搜索用户昵称或 QQ",
+};
 const defaultFilters = (): StatisticsFilters => ({
   sources: ["tournament", "casual"],
   eventIds: [],
@@ -81,13 +122,23 @@ export default function Statistics() {
   const [filterOpen, setFilterOpen] = createSignal(false);
   const [draft, setDraft] = createSignal(defaultFilters());
   const [filters, setFilters] = createSignal(defaultFilters());
-  const [tab, setTab] = createSignal<
-    "characters" | "actionCards" | "combinations" | "users"
-  >("characters");
+  const [tab, setTab] = createSignal<Tab>("characters");
   const [selectedCombination, setSelectedCombination] = createSignal<
     string | null
   >(null);
   const [selectedUser, setSelectedUser] = createSignal<number | null>(null);
+  const [searches, setSearches] = createSignal<Record<Tab, string>>({
+    characters: "",
+    actionCards: "",
+    combinations: "",
+    users: "",
+  });
+  const [sortFields, setSortFields] = createSignal<Record<Tab, SortField>>({
+    characters: "appearances",
+    actionCards: "appearances",
+    combinations: "appearances",
+    users: "games",
+  });
   const [options] = createResource(() =>
     axios
       .get<StatisticsOptions>("admin/statistics/options")
@@ -173,11 +224,69 @@ export default function Statistics() {
           .map((x) => assetsManager().getNameSync(Number(x)))
           .join(" / ")
       : assetsManager().getNameSync(Number(id));
+  const query = (value: string) => value.trim().toLocaleLowerCase();
+  const matches = (value: string | number | undefined, search: string) =>
+    String(value ?? "")
+      .toLocaleLowerCase()
+      .includes(search);
+  const sortAggregates = (rows: Aggregate[], field: AggregateSortField) =>
+    [...rows].sort(
+      (a, b) =>
+        Number(b[field] ?? 0) - Number(a[field] ?? 0) ||
+        a.id.localeCompare(b.id),
+    );
+  const characterRows = createMemo(() => {
+    const search = query(searches().characters);
+    return sortAggregates(
+      (overview()?.characters ?? []).filter(
+        (item) =>
+          !search || matches(item.id, search) || matches(name(item.id), search),
+      ),
+      sortFields().characters as AggregateSortField,
+    );
+  });
+  const actionCardRows = createMemo(() => {
+    const search = query(searches().actionCards);
+    return sortAggregates(
+      (overview()?.actionCards ?? []).filter(
+        (item) =>
+          !search || matches(item.id, search) || matches(name(item.id), search),
+      ),
+      sortFields().actionCards as AggregateSortField,
+    );
+  });
+  const combinationRows = createMemo(() => {
+    const search = query(searches().combinations);
+    return sortAggregates(
+      (overview()?.combinations ?? []).filter(
+        (item) =>
+          !search ||
+          item.id
+            .split(":")
+            .some(
+              (id) =>
+                matches(id, search) ||
+                matches(assetsManager().getNameSync(Number(id)), search),
+            ),
+      ),
+      sortFields().combinations as AggregateSortField,
+    );
+  });
+  const userRows = createMemo(() => {
+    const search = query(searches().users);
+    const field = sortFields().users as UserSortField;
+    return (overview()?.users ?? [])
+      .filter(
+        (user) =>
+          !search || matches(user.name, search) || matches(user.qq, search),
+      )
+      .toSorted((a, b) => b[field] - a[field] || a.id - b.id);
+  });
 
   return (
     <AdminPage title="业务统计">
       <div class="sticky top-0 z-10 bg-white pb-3">
-        <div class="rounded-lg b b-gray-2 bg-white p-3 mb-3">
+        <div class="rounded-lg b b-gray-2 bg-white p-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <p class="text-sm">
               <Show when={!overview.loading} fallback="正在查询统计样本…">
@@ -420,7 +529,7 @@ export default function Statistics() {
           </Show>
         </div>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 my-4">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
         <For
           each={
             [
@@ -447,11 +556,28 @@ export default function Statistics() {
         </For>
       </div>
       <Show when={!selectedCombination() && !selectedUser()}>
+        <StatisticsListToolbar
+          search={searches()[tab()]}
+          searchPlaceholder={searchPlaceholders[tab()]}
+          sort={sortFields()[tab()]}
+          sortOptions={
+            sortOptions[tab()] as readonly {
+              value: SortField;
+              label: string;
+            }[]
+          }
+          onSearch={(value) =>
+            setSearches((current) => ({ ...current, [tab()]: value }))
+          }
+          onSort={(value) =>
+            setSortFields((current) => ({ ...current, [tab()]: value }))
+          }
+        />
         <Show
           when={tab() !== "users"}
           fallback={
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <For each={overview()?.users}>
+              <For each={userRows()}>
                 {(user) => (
                   <StatisticsUserCard
                     id={user.id}
@@ -470,7 +596,7 @@ export default function Statistics() {
         >
           <Show when={tab() === "characters"}>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <For each={overview()?.characters}>
+              <For each={characterRows()}>
                 {(character) => (
                   <StatisticsCharacterCard
                     id={Number(character.id)}
@@ -485,7 +611,7 @@ export default function Statistics() {
           </Show>
           <Show when={tab() === "actionCards"}>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <For each={overview()?.actionCards}>
+              <For each={actionCardRows()}>
                 {(actionCard) => (
                   <StatisticsActionCard
                     id={Number(actionCard.id)}
@@ -502,7 +628,7 @@ export default function Statistics() {
           </Show>
           <Show when={tab() === "combinations"}>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <For each={overview()?.combinations}>
+              <For each={combinationRows()}>
                 {(combination) => (
                   <StatisticsCombinationCard
                     id={combination.id}
