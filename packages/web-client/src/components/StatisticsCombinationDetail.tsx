@@ -88,7 +88,7 @@ function RateWithDelta(props: {
   );
 }
 
-function CombinationTag(props: {
+export function CombinationTag(props: {
   id: string;
   variant: "advantage" | "disadvantage" | "position";
 }) {
