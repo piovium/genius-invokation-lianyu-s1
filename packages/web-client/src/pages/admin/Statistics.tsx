@@ -8,6 +8,7 @@ import {
 } from "../../components/StatisticsCombinationDetail";
 import { StatisticsUserDetail } from "../../components/StatisticsUserDetail";
 import { StatisticsCharacterCard } from "../../components/StatisticsCharacterCard";
+import { StatisticsActionCard } from "../../components/StatisticsActionCard";
 
 type Source = "tournament" | "casual";
 interface StatisticsFilters {
@@ -509,7 +510,24 @@ export default function Statistics() {
               </For>
             </div>
           </Show>
-          <Show when={tab() !== "characters"}>
+          <Show when={tab() === "actionCards"}>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <For each={overview()?.actionCards}>
+                {(actionCard) => (
+                  <StatisticsActionCard
+                    id={Number(actionCard.id)}
+                    appearances={actionCard.appearances}
+                    appearanceRate={actionCard.appearanceRate}
+                    wins={actionCard.wins}
+                    winRate={actionCard.winRate}
+                    averageCopies={actionCard.averageCopies ?? 0}
+                    netCopies={actionCard.netCopies ?? 0}
+                  />
+                )}
+              </For>
+            </div>
+          </Show>
+          <Show when={tab() === "combinations"}>
             <div class="overflow-x-auto table-root">
               <table class="table w-full">
                 <thead class="table-header">
