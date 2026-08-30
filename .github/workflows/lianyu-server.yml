@@ -5,7 +5,7 @@ on:
     branches: ["feat-lianyu"]
 
 env:
-  IMAGE_NAME: piovium/genius-invokation-lianyu-s1
+  IMAGE_NAME: genius-invokation/genius-invokation
 
 jobs:
   Build-Server-Image:
