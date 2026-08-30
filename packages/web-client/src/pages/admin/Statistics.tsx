@@ -7,6 +7,7 @@ import {
   StatisticsCombinationDetail,
 } from "../../components/StatisticsCombinationDetail";
 import { StatisticsUserDetail } from "../../components/StatisticsUserDetail";
+import { StatisticsCharacterCard } from "../../components/StatisticsCharacterCard";
 
 type Source = "tournament" | "casual";
 interface StatisticsFilters {
@@ -493,78 +494,97 @@ export default function Statistics() {
             </div>
           }
         >
-          <div class="overflow-x-auto table-root">
-            <table class="table w-full">
-              <thead class="table-header">
-                <tr class="table-row">
-                  <th class="table-head">卡牌 / 组合</th>
-                  <th class="table-head">出场数</th>
-                  <th class="table-head">出场率</th>
-                  <th class="table-head">胜场</th>
-                  <th class="table-head">胜率</th>
-                  <Show when={tab() === "actionCards"}>
-                    <th class="table-head">平均携带</th>
-                    <th class="table-head">净携带</th>
-                  </Show>
-                  <Show when={tab() === "combinations"}>
-                    <th class="table-head">外战场数</th>
-                    <th class="table-head">外战胜率</th>
-                  </Show>
-                </tr>
-              </thead>
-              <tbody class="table-body">
-                <For each={rows()}>
-                  {(row) => (
-                    <tr
-                      class={`table-row ${
-                        tab() === "combinations"
-                          ? "cursor-pointer hover:bg-gray-1"
-                          : ""
-                      }`}
-                      role={tab() === "combinations" ? "button" : undefined}
-                      tabIndex={tab() === "combinations" ? 0 : undefined}
-                      onClick={() => {
-                        if (tab() === "combinations") {
-                          setSelectedCombination(row.id);
-                        }
-                      }}
-                      onKeyDown={(event) => {
-                        if (
-                          tab() === "combinations" &&
-                          (event.key === "Enter" || event.key === " ")
-                        ) {
-                          event.preventDefault();
-                          setSelectedCombination(row.id);
-                        }
-                      }}
-                    >
-                      <td class="table-cell">
-                        <b>{name(row.id)}</b>
-                        <br />
-                        <small>{row.id}</small>
-                      </td>
-                      <td class="table-cell">{row.appearances}</td>
-                      <td class="table-cell">{pct(row.appearanceRate)}</td>
-                      <td class="table-cell">{row.wins}</td>
-                      <td class="table-cell">{pct(row.winRate)}</td>
-                      <Show when={tab() === "actionCards"}>
+          <Show when={tab() === "characters"}>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <For each={overview()?.characters}>
+                {(character) => (
+                  <StatisticsCharacterCard
+                    id={Number(character.id)}
+                    appearances={character.appearances}
+                    appearanceRate={character.appearanceRate}
+                    wins={character.wins}
+                    winRate={character.winRate}
+                  />
+                )}
+              </For>
+            </div>
+          </Show>
+          <Show when={tab() !== "characters"}>
+            <div class="overflow-x-auto table-root">
+              <table class="table w-full">
+                <thead class="table-header">
+                  <tr class="table-row">
+                    <th class="table-head">卡牌 / 组合</th>
+                    <th class="table-head">出场数</th>
+                    <th class="table-head">出场率</th>
+                    <th class="table-head">胜场</th>
+                    <th class="table-head">胜率</th>
+                    <Show when={tab() === "actionCards"}>
+                      <th class="table-head">平均携带</th>
+                      <th class="table-head">净携带</th>
+                    </Show>
+                    <Show when={tab() === "combinations"}>
+                      <th class="table-head">外战场数</th>
+                      <th class="table-head">外战胜率</th>
+                    </Show>
+                  </tr>
+                </thead>
+                <tbody class="table-body">
+                  <For each={rows()}>
+                    {(row) => (
+                      <tr
+                        class={`table-row ${
+                          tab() === "combinations"
+                            ? "cursor-pointer hover:bg-gray-1"
+                            : ""
+                        }`}
+                        role={tab() === "combinations" ? "button" : undefined}
+                        tabIndex={tab() === "combinations" ? 0 : undefined}
+                        onClick={() => {
+                          if (tab() === "combinations") {
+                            setSelectedCombination(row.id);
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (
+                            tab() === "combinations" &&
+                            (event.key === "Enter" || event.key === " ")
+                          ) {
+                            event.preventDefault();
+                            setSelectedCombination(row.id);
+                          }
+                        }}
+                      >
                         <td class="table-cell">
-                          {(row.averageCopies ?? 0).toFixed(2)}
+                          <b>{name(row.id)}</b>
+                          <br />
+                          <small>{row.id}</small>
                         </td>
-                        <td class="table-cell">
-                          {(row.netCopies ?? 0).toFixed(2)}
-                        </td>
-                      </Show>
-                      <Show when={tab() === "combinations"}>
-                        <td class="table-cell">{row.awayAppearances ?? 0}</td>
-                        <td class="table-cell">{pct(row.awayWinRate ?? 0)}</td>
-                      </Show>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </div>
+                        <td class="table-cell">{row.appearances}</td>
+                        <td class="table-cell">{pct(row.appearanceRate)}</td>
+                        <td class="table-cell">{row.wins}</td>
+                        <td class="table-cell">{pct(row.winRate)}</td>
+                        <Show when={tab() === "actionCards"}>
+                          <td class="table-cell">
+                            {(row.averageCopies ?? 0).toFixed(2)}
+                          </td>
+                          <td class="table-cell">
+                            {(row.netCopies ?? 0).toFixed(2)}
+                          </td>
+                        </Show>
+                        <Show when={tab() === "combinations"}>
+                          <td class="table-cell">{row.awayAppearances ?? 0}</td>
+                          <td class="table-cell">
+                            {pct(row.awayWinRate ?? 0)}
+                          </td>
+                        </Show>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </Show>
         </Show>
       </Show>
       <Show when={selectedCombination()}>
