@@ -71,6 +71,29 @@ export default function EventEditor() {
     return result;
   });
   const user = (id: number) => users()?.find((item) => item.id === id);
+  const hasFaced = (userId: number, opponentId: number) =>
+    (rankings() ?? []).some(
+      (ranking) =>
+        (ranking.userId === userId &&
+          ranking.opponents.includes(opponentId)) ||
+        (ranking.userId === opponentId && ranking.opponents.includes(userId)),
+    );
+  const repeatedPairs = () =>
+    side0().flatMap((userId, index) => {
+      const opponentId = side1()[index];
+      return opponentId !== undefined && hasFaced(userId, opponentId)
+        ? [{ userId, opponentId }]
+        : [];
+    });
+  const repeatedPair = (side: 0 | 1, index: number) => {
+    const userId = (side === 0 ? side0() : side1())[index];
+    const opponentId = (side === 0 ? side1() : side0())[index];
+    return (
+      userId !== undefined &&
+      opponentId !== undefined &&
+      hasFaced(userId, opponentId)
+    );
+  };
   const sideLabel = (side: 0 | 1) => (side === 0 ? "A 方" : "B 方");
   const add = (side: 0 | 1, ids: number[]) => {
     const occupied = new Set([...side0(), ...side1()]);
@@ -99,9 +122,18 @@ export default function EventEditor() {
     }
     const pairs = Math.max(side0().length, side1().length),
       byes = Math.abs(side0().length - side1().length);
+    const repeats = repeatedPairs();
+    const repeatedWarning = repeats.length
+      ? `\n\n检测到 ${repeats.length} 组重复对阵：${repeats
+          .map(
+            ({ userId, opponentId }) =>
+              `${user(userId)?.name ?? `#${userId}`} vs ${user(opponentId)?.name ?? `#${opponentId}`}`,
+          )
+          .join("；")}。`
+      : "";
     if (
       !confirm(
-        `确认创建 ${pairs} 盘（双人 ${pairs - byes}、轮空 ${byes}），共 ${side0().length + side1().length} 位选手？`,
+        `确认创建 ${pairs} 盘（双人 ${pairs - byes}、轮空 ${byes}），共 ${side0().length + side1().length} 位选手？${repeatedWarning}`,
       )
     )
       return;
@@ -176,46 +208,59 @@ export default function EventEditor() {
       </div>
       <ol class="flex flex-col gap-1">
         <For each={ids}>
-          {(id, index) => (
-            <li class="rounded bg-gray-50 p-2 flex items-center gap-2">
-              <span class="w-6 text-gray-5">{index() + 1}</span>
-              <span class="flex-1">
-                {user(id)?.name} <small>{user(id)?.qq}</small>
-              </span>
-              <button
-                type="button"
-                class="btn btn-ghost"
-                aria-label="上移"
-                onClick={() =>
-                  which === 0
-                    ? setSide0(move(side0(), index(), -1))
-                    : setSide1(move(side1(), index(), -1))
-                }
+          {(id, index) => {
+            const repeated = () => repeatedPair(which, index());
+            return (
+              <li
+                class="rounded p-2 flex items-center gap-2"
+                classList={{
+                  "bg-gray-50": !repeated(),
+                  "b b-red-3 bg-red-100 text-red-8": repeated(),
+                }}
+                title={repeated() ? "双方曾在所选历史场次中直接对阵" : ""}
               >
-                ↑
-              </button>
-              <button
-                type="button"
-                aria-label="下移"
-                class="btn btn-ghost"
-                onClick={() =>
-                  which === 0
-                    ? setSide0(move(side0(), index(), 1))
-                    : setSide1(move(side1(), index(), 1))
-                }
-              >
-                ↓
-              </button>
-              <button
-                type="button"
-                class="btn btn-ghost-red"
-                aria-label="移除"
-                onClick={() => remove(which, id)}
-              >
-                ×
-              </button>
-            </li>
-          )}
+                <span class="w-6 text-gray-5">{index() + 1}</span>
+                <span class="flex-1">
+                  {user(id)?.name} <small>{user(id)?.qq}</small>
+                </span>
+                <Show when={repeated()}>
+                  <span class="badge badge-soft-error shrink-0">曾对阵</span>
+                </Show>
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  aria-label="上移"
+                  onClick={() =>
+                    which === 0
+                      ? setSide0(move(side0(), index(), -1))
+                      : setSide1(move(side1(), index(), -1))
+                  }
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label="下移"
+                  class="btn btn-ghost"
+                  onClick={() =>
+                    which === 0
+                      ? setSide0(move(side0(), index(), 1))
+                      : setSide1(move(side1(), index(), 1))
+                  }
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost-red"
+                  aria-label="移除"
+                  onClick={() => remove(which, id)}
+                >
+                  ×
+                </button>
+              </li>
+            );
+          }}
         </For>
       </ol>
     </div>
