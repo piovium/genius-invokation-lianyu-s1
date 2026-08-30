@@ -233,6 +233,7 @@ describe("StatisticsService filters", () => {
         name: "User 7",
         games: 1,
         wins: 1,
+        netWins: 1,
         winRate: 1,
       },
     ]);
@@ -440,7 +441,12 @@ describe("StatisticsService filters", () => {
 
     const result = await service.user(7, defaults());
 
-    expect(result.overview).toEqual({ games: 2, wins: 1, winRate: 0.5 });
+    expect(result.overview).toEqual({
+      games: 2,
+      wins: 1,
+      netWins: 0,
+      winRate: 0.5,
+    });
     expect(result.combinations).toEqual([
       {
         id: "1:2:3",

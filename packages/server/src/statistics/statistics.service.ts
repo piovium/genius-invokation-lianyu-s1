@@ -141,7 +141,10 @@ export class StatisticsService {
     const characters = new Map<string, Aggregate>();
     const actionCards = new Map<string, Aggregate>();
     const combinations = new Map<string, Aggregate>();
-    const users = new Map<number, { games: number; wins: number }>();
+    const users = new Map<
+      number,
+      { games: number; wins: number; netWins: number }
+    >();
     const touch = (map: Map<string, Aggregate>, id: string, win: boolean) => {
       const item = map.get(id) ?? { appearances: 0, wins: 0 };
       item.appearances++;
@@ -175,9 +178,15 @@ export class StatisticsService {
         const item = users.get(player.userId) ?? {
           games: 0,
           wins: 0,
+          netWins: 0,
         };
         item.games++;
-        if (game.winnerWho === player.who) item.wins++;
+        if (game.winnerWho === player.who) {
+          item.wins++;
+          item.netWins++;
+        } else if (game.winnerWho !== null) {
+          item.netWins--;
+        }
         users.set(player.userId, item);
       }
     }
@@ -221,6 +230,7 @@ export class StatisticsService {
           ...profile,
           games: item.games,
           wins: item.wins,
+          netWins: item.netWins,
           winRate: item.games ? item.wins / item.games : 0,
         };
       }),
@@ -433,6 +443,7 @@ export class StatisticsService {
     const combinations = new Map<string, Counter>();
     let appearances = 0;
     let wins = 0;
+    let netWins = 0;
     const touch = (map: Map<string, Counter>, id: string, win: boolean) => {
       const item = map.get(id) ?? { appearances: 0, wins: 0 };
       item.appearances++;
@@ -448,7 +459,12 @@ export class StatisticsService {
         touch(overall, key, win);
         if (player.userId !== userId) continue;
         appearances++;
-        if (win) wins++;
+        if (win) {
+          wins++;
+          netWins++;
+        } else if (game.winnerWho !== null) {
+          netWins--;
+        }
         touch(combinations, key, win);
       }
     }
@@ -460,6 +476,7 @@ export class StatisticsService {
       overview: {
         games: appearances,
         wins,
+        netWins,
         winRate: rate(wins, appearances),
       },
       combinations: [...combinations.entries()]
