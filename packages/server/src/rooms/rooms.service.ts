@@ -76,6 +76,10 @@ import type {
 import { DecksService } from "../decks/decks.service";
 import { UsersService } from "../users/users.service";
 import { GamesService } from "../games/games.service";
+import {
+  ioErrorEndReason,
+  type RuntimeGameEndReason,
+} from "../games/game-end-reason";
 import { inspect } from "node:util";
 import { randomUUID } from "node:crypto";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -135,7 +139,7 @@ interface TournamentGameJoinInput extends TournamentRoomReservation {
   finalize: (result: {
     winnerWho: number | null;
     roundCount: number | null;
-    endReason: "NORMAL" | "ENGINE_ERROR" | "SURRENDER";
+    endReason: RuntimeGameEndReason;
     stateLog: unknown;
   }) => Promise<unknown>;
 }
@@ -279,10 +283,8 @@ class Player implements PlayerIOWithError {
   private _mutationExtraTimeout = 0;
 
   private _contiguousTimeoutRpcExecuted = 0;
+  private _timedOut = false;
   private _oppPlayer: Player | null = null;
-
-  private _game: InternalGame | null = null;
-  private _who: 0 | 1 = 0;
 
   setTimeoutConfig(config: RoomConfig) {
     this._timeoutConfig = config;
@@ -345,9 +347,7 @@ class Player implements PlayerIOWithError {
   private timeoutRpc(request: RpcRequest): Promise<RpcResponse> {
     this._contiguousTimeoutRpcExecuted++;
     if (this.playerInfo.isGuest && this._contiguousTimeoutRpcExecuted >= 3) {
-      if (this._game && this._who !== null) {
-        this._game?.giveUp(this._who);
-      }
+      this._timedOut = true;
       throw new Error(`Give up actions due to too many timeout of guest`);
     }
     return dispatchRpc({
@@ -443,9 +443,10 @@ class Player implements PlayerIOWithError {
       message,
     });
   }
-  onInitialized(who: 0 | 1, game: InternalGame, oppPlayer: Player) {
-    this._who = who;
-    this._game = game;
+  get timedOut() {
+    return this._timedOut;
+  }
+  onInitialized(who: 0 | 1, oppPlayer: Player) {
     this._oppPlayer = oppPlayer;
     this.initializedSubject.next({
       type: "initialized",
@@ -512,7 +513,7 @@ class Room {
   private onStopHandlers: GameStopHandler[] = [];
   private startedAt: Date | null = null;
   private endedAt: Date | null = null;
-  private endReason: "NORMAL" | "ENGINE_ERROR" | "SURRENDER" = "NORMAL";
+  private endReason: RuntimeGameEndReason = "NORMAL";
   private suppressTournamentFinalize = false;
   private tournamentFinalizePromise: Promise<void> | null = null;
 
@@ -625,6 +626,8 @@ class Room {
       }
     };
     game.onIoError = (e) => {
+      const failedPlayer = e.who === 0 ? player0 : player1;
+      this.endReason = ioErrorEndReason(failedPlayer.timedOut);
       if (e.who === 0) {
         player0.onError(e);
       } else if (e.who === 1) {
@@ -633,8 +636,8 @@ class Room {
     };
     game.players[0].io = player0;
     game.players[1].io = player1;
-    player0.onInitialized(0, game, player1);
-    player1.onInitialized(1, game, player0);
+    player0.onInitialized(0, player1);
+    player1.onInitialized(1, player0);
     (async () => {
       try {
         this.game = game;

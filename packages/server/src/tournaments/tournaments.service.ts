@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { CORE_VERSION, CURRENT_VERSION } from "@gi-tcg/core";
 import { Prisma, type GameEndReason } from "#prisma/client";
+import { resolveCountForStats } from "../games/game-end-reason";
 import { PrismaService } from "../db/prisma.service";
 import { BusinessException } from "../errors";
 import { ASSETS_MANAGER, MATCH_CONFIG_VERSION } from "../utils";
@@ -853,8 +854,10 @@ export class TournamentsService {
           roundCount: input.roundCount,
           endReason: input.endReason,
           stateLog: json(input.stateLog),
-          countForStats:
-            input.countForStats ?? input.endReason !== "ENGINE_ERROR",
+          countForStats: resolveCountForStats(
+            input.endReason,
+            input.countForStats,
+          ),
           finishedAt: new Date(),
         },
       });
