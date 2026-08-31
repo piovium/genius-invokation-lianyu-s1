@@ -31,6 +31,8 @@ const endReasonLabel: Record<string, string> = {
   NORMAL: "正常结束",
   ENGINE_ERROR: "引擎错误",
   SURRENDER: "投降",
+  IO_ERROR: "客户端响应异常",
+  TIMEOUT: "连续操作超时",
   ADMIN: "管理员结束",
 };
 

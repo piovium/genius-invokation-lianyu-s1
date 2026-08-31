@@ -8,6 +8,10 @@ import { PrismaService } from "../db/prisma.service";
 import type { PaginationDto, PaginationResult } from "../utils";
 import { MetricsService } from "../metrics/metrics.service";
 import { characterKey } from "../decks/decks.service";
+import {
+  resolveCountForStats,
+  type RuntimeGameEndReason,
+} from "./game-end-reason";
 
 export interface AddGameOption {
   persistenceKey: string;
@@ -22,7 +26,7 @@ export interface AddGameOption {
   stateLog: unknown;
   winnerWho: number | null;
   roundCount?: number | null;
-  endReason?: "NORMAL" | "ENGINE_ERROR" | "SURRENDER";
+  endReason?: RuntimeGameEndReason;
   countForStats?: boolean;
   startedAt?: Date | null;
   finishedAt?: Date;
@@ -50,8 +54,10 @@ export class GamesService {
         winnerWho: input.winnerWho,
         roundCount: input.roundCount,
         endReason: input.endReason ?? "NORMAL",
-        countForStats:
-          input.countForStats ?? input.endReason !== "ENGINE_ERROR",
+        countForStats: resolveCountForStats(
+          input.endReason,
+          input.countForStats,
+        ),
         startedAt: input.startedAt,
         finishedAt: input.finishedAt ?? new Date(),
         players: {

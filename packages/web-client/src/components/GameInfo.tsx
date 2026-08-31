@@ -18,7 +18,13 @@ import axios from "axios";
 import { useI18n } from "../i18n";
 import { errorMessage } from "../api/errors";
 
-type GameEndReason = "NORMAL" | "ENGINE_ERROR" | "SURRENDER" | "ADMIN";
+type GameEndReason =
+  | "NORMAL"
+  | "ENGINE_ERROR"
+  | "SURRENDER"
+  | "IO_ERROR"
+  | "TIMEOUT"
+  | "ADMIN";
 
 export interface GameRecord {
   who: number;
