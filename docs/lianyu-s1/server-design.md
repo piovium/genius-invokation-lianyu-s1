@@ -108,7 +108,7 @@ EventPhase             DECK_COLLECTION | RUNNING | FINISHED
 MatchMode              UNRESTRICTED | DUEL | CONQUEST
 ParticipantStatus      ACTIVE | WITHDRAWN
 GameStatus             PENDING | FINISHED
-GameEndReason          NORMAL | ENGINE_ERROR | SURRENDER | ADMIN
+GameEndReason          NORMAL | ENGINE_ERROR | SURRENDER | IO_ERROR | TIMEOUT | ADMIN
 MatchDeckDisableReason DUEL_USED | CONQUEST_WINNER_USED | ADMIN
 ```
 
@@ -465,7 +465,7 @@ Room 额外保存 `tournamentGameId` 和结束原因。服务重启后内存 Roo
 - 两副完整牌组 JSON 和显示名；
 - core/config 版本、原始赢家、结束原因、终局回合数、统计开关和 State Log。
 
-只有房间从未真正开始时不入库。模拟器错误也入库，但 `endReason=ENGINE_ERROR` 且 `countForStats=false`。S3 上传继续作为可选备份，数据库写入失败必须记录高优先级日志并上报运行指标，不能被 S3 成功掩盖。
+只有房间从未真正开始时不入库。模拟器错误、玩家 I/O 异常和游客连续操作超时也入库，分别使用 `ENGINE_ERROR`、`IO_ERROR` 和 `TIMEOUT`；三者均设置 `countForStats=false`。S3 上传继续作为可选备份，数据库写入失败必须记录高优先级日志并上报运行指标，不能被 S3 成功掩盖。
 
 ### 10.4 对局结束事务
 

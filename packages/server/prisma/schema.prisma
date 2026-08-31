@@ -49,6 +49,8 @@ enum GameEndReason {
   NORMAL
   ENGINE_ERROR
   SURRENDER
+  IO_ERROR
+  TIMEOUT
   ADMIN
 }
 
