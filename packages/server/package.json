@@ -9,7 +9,7 @@
     "build": "pnpm prisma:generate && gnx scripts/build.ts",
     "start": "gnx dist/main.js",
     "check": "tsc --noEmit",
-    "test": "vitest run src/auth/registration-code.test.ts src/auth/auth-rate-limit.service.test.ts src/registration/registration-window.test.ts src/rooms/room-runtime.test.ts src/statistics/statistics.service.test.ts src/tournaments/admin-reason.dto.test.ts src/tournaments/tournament-room-recovery.service.test.ts src/tournaments/tournaments.service.test.ts src/users/users.service.test.ts",
+    "test": "vitest run src/auth/registration-code.test.ts src/auth/auth-rate-limit.service.test.ts src/games/game-end-reason.test.ts src/registration/registration-window.test.ts src/rooms/room-runtime.test.ts src/statistics/statistics.service.test.ts src/tournaments/admin-reason.dto.test.ts src/tournaments/tournament-room-recovery.service.test.ts src/tournaments/tournaments.service.test.ts src/users/users.service.test.ts",
     "debug": "nest start --debug --watch"
   },
   "imports": {
