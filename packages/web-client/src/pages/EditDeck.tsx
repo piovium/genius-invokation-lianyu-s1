@@ -61,10 +61,12 @@ export default function EditDeck() {
     isNew ? void 0 : axios.get(`decks/${deckId}`).then((r) => r.data),
   );
   const competition = () =>
-    (
-      userDeckData() as
-        (DeckInfo & { competition?: MatchDeck | null }) | undefined
-    )?.competition;
+    userDeckData.error
+      ? undefined
+      : (
+          userDeckData() as
+            (DeckInfo & { competition?: MatchDeck | null }) | undefined
+        )?.competition;
   const fullyLocked = () => competition()?.match?.event.phase === "RUNNING";
   const competitionNotice = () =>
     fullyLocked()
