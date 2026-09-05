@@ -81,8 +81,9 @@ export const useGuestDecks = (): GuestDeck => {
     }
     const oldDeck = guestDeck[index];
     const { data } = await axios.post<VersionResponse>("decks/version", {
-      ...oldDeck,
-      ...newDeck,
+      name: newDeck.name ?? oldDeck.name,
+      characters: newDeck.characters ?? oldDeck.characters,
+      cards: newDeck.cards ?? oldDeck.cards,
     });
     const result: DeckInfo = { ...data, id };
     setGuestDeck(
