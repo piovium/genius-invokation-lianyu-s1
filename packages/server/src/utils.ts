@@ -18,10 +18,7 @@ import {
   AssetsManager,
   DEFAULT_ASSETS_API_ENDPOINT,
   DEFAULT_ASSETS_MANAGER,
-  type ActionCardRawData,
-  type AnyData,
   type AssetsManagerOption,
-  type CharacterRawData,
   type OverrideData,
 } from "@gi-tcg/assets-manager";
 import {
@@ -39,7 +36,6 @@ import {
   type Version,
   type VersionBehavior,
 } from "@gi-tcg/core";
-import { compare as semverCompare } from "semver";
 import {
   plainToClass,
   Transform,
@@ -102,12 +98,6 @@ export const GAME_VERSION_BEHAVIOR: VersionBehavior = {
 
 export const ASSETS_MANAGER = new AssetsManager(ASSETS_MANAGER_OPTIONS);
 
-ASSETS_MANAGER.prepareForSync();
-
-const getData = <T extends AnyData>(id: number): Promise<T | undefined> => {
-  return ASSETS_MANAGER.getData(id) as Promise<T | undefined>;
-};
-
 const SINGLETON_REQUIRED_TAGS = ["GCG_TAG_LEGEND", "GCG_TAG_CARD_BLESSING"];
 
 /**
@@ -120,7 +110,7 @@ export async function verifyDeck({
   cards,
 }: Deck): Promise<Version> {
   const DEC = DeckVerificationErrorCode;
-  const versions = new Set<string | undefined>();
+  const deckData = await ASSETS_MANAGER.getDeckData();
   const characterSet = new Set(characters);
   if (characterSet.size !== 3) {
     throw new DeckVerificationError(
@@ -136,25 +126,18 @@ export async function verifyDeck({
   }
   const characterTags = [];
   for (const chId of characters) {
-    const character = await getData<CharacterRawData>(chId);
+    const character = deckData.characters.get(chId);
     if (!character) {
       throw new DeckVerificationError(
         DEC.NotFoundError,
         `character id ${chId} not found`,
       );
     }
-    if (typeof character.shareId !== "number") {
-      throw new DeckVerificationError(
-        DEC.NotFoundError,
-        `character id ${chId} not obtainable`,
-      );
-    }
     characterTags.push(...character.tags);
-    versions.add(character.sinceVersion);
   }
   const cardCounts = new Map<number, number>();
   for (const cardId of cards) {
-    const card = await getData<ActionCardRawData>(cardId);
+    const card = deckData.actionCards.get(cardId);
     if (!card) {
       throw new DeckVerificationError(
         DEC.NotFoundError,
@@ -176,12 +159,6 @@ export async function verifyDeck({
       }
       cardCounts.set(cardId, count);
     } else {
-      if (typeof card.shareId !== "number") {
-        throw new DeckVerificationError(
-          DEC.RelationError,
-          `card id ${cardId} not obtainable`,
-        );
-      }
       if (
         card.relatedCharacterId !== null &&
         !characters.includes(card.relatedCharacterId)
@@ -191,19 +168,17 @@ export async function verifyDeck({
           `card id ${cardId} related character not in deck`,
         );
       }
-      const tempCharacterTags = [...characterTags];
-      for (const requiredTag of card.relatedCharacterTags) {
-        const idx = tempCharacterTags.indexOf(requiredTag);
-        if (idx === -1) {
-          throw new DeckVerificationError(
-            DEC.RelationError,
-            `card id ${cardId} related character tags not in deck`,
-          );
-        }
-        tempCharacterTags.splice(idx, 1);
+      if (
+        card.relatedCharacterTag !== null &&
+        characterTags.filter((tag) => tag === card.relatedCharacterTag)
+          .length < 2
+      ) {
+        throw new DeckVerificationError(
+          DEC.RelationError,
+          `card id ${cardId} related character tags not in deck`,
+        );
       }
       cardCounts.set(cardId, 1);
-      versions.add(card.sinceVersion);
     }
   }
   return CURRENT_VERSION;
