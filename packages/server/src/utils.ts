@@ -100,7 +100,11 @@ export const GAME_VERSION_BEHAVIOR: VersionBehavior = {
   discardMaxCostHandsAbortPreview: false,
 };
 
-export const ASSETS_MANAGER = new AssetsManager(ASSETS_MANAGER_OPTIONS);
+export const ASSETS_MANAGER = new AssetsManager({
+  ...ASSETS_MANAGER_OPTIONS,
+  // server-side only override
+  apiEndpoint: process.env.SERVER_ASSETS_API_ENDPOINT || DEFAULT_ASSETS_API_ENDPOINT,
+});
 
 ASSETS_MANAGER.prepareForSync();
 
