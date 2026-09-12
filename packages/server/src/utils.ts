@@ -96,7 +96,7 @@ export const ASSETS_MANAGER_OPTIONS: Partial<AssetsManagerOption> = {
 };
 export { gameData as GAME_DATA };
 export const GAME_VERSION_BEHAVIOR: VersionBehavior = {
-  ...getVersionBehavior("v7.0.0"),
+  ...getVersionBehavior(CURRENT_VERSION),
   discardMaxCostHandsAbortPreview: false,
 };
 

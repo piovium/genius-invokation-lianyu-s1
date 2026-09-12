@@ -6,6 +6,7 @@ import {
 } from "@gi-tcg/assets-manager";
 import {
   createOfficialVersionResolver,
+  CURRENT_VERSION,
   getVersionBehavior,
   type Version,
   type VersionBehavior,
@@ -34,7 +35,7 @@ const [gameData, assetsManagerOptions] = customDataLoader.done();
 
 export const GAME_DATA = gameData;
 export const GAME_VERSION_BEHAVIOR: VersionBehavior = {
-  ...getVersionBehavior("v7.0.0"),
+  ...getVersionBehavior(CURRENT_VERSION),
   discardMaxCostHandsAbortPreview: false,
 };
 export const ASSETS_MANAGER_OPTIONS: Partial<AssetsManagerOption> = {
