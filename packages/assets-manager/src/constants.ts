@@ -20,7 +20,7 @@ export const DEFAULT_ASSETS_API_ENDPOINT: string =
   import.meta.env?.DEFAULT_ASSETS_API_ENDPOINT ||
   // @ts-expect-error Node.js typing
   globalThis.process?.env.DEFAULT_ASSETS_API_ENDPOINT ||
-  "https://static-data.piovium.org/api/v4";
+  "https://static-data-lianyu-s1-temp.xqm32.cloud/api/v4";
 
 const preferredLanguage =
   globalThis?.navigator?.languages?.[0] ??
