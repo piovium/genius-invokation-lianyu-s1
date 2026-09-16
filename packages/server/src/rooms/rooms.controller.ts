@@ -19,7 +19,6 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
@@ -200,13 +199,6 @@ export class RoomsController {
     @Param("roomId", ParseIntPipe) roomId: number,
   ) {
     const room = this.rooms.getRoom(roomId);
-    if (
-      !isAdmin &&
-      room.config.private &&
-      !room.players.some((player) => player.id === playerId)
-    ) {
-      throw new NotFoundException(`Room ${roomId} not found`);
-    }
     if (!isAdmin && playerId === null && !room.config.allowGuest) {
       throw new UnauthorizedException(`This room does not allow guests`);
     }
