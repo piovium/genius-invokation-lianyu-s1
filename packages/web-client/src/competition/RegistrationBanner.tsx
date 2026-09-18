@@ -76,29 +76,29 @@ export function RegistrationBanner() {
     }
   };
 
-  const withdraw = async () => {
-    const current = user();
-    if (
-      !current ||
-      !confirm(
-        current.competitionStatus === "PLAYER"
-          ? "确认退赛？该操作不会自动终止开放对局。"
-          : "确认取消报名？",
-      )
-    )
-      return;
-    setBusy(true);
-    setMessage("");
-    try {
-      await axios.delete("users/me/registration");
-      await auth.refresh();
-      setMessage("已退出本届赛事。");
-    } catch (reason) {
-      setMessage(errorMessage(reason));
-    } finally {
-      setBusy(false);
-    }
-  };
+  // const withdraw = async () => {
+  //   const current = user();
+  //   if (
+  //     !current ||
+  //     !confirm(
+  //       current.competitionStatus === "PLAYER"
+  //         ? "确认退赛？该操作不会自动终止开放对局。"
+  //         : "确认取消报名？",
+  //     )
+  //   )
+  //     return;
+  //   setBusy(true);
+  //   setMessage("");
+  //   try {
+  //     await axios.delete("users/me/registration");
+  //     await auth.refresh();
+  //     setMessage("已退出本届赛事。");
+  //   } catch (reason) {
+  //     setMessage(errorMessage(reason));
+  //   } finally {
+  //     setBusy(false);
+  //   }
+  // };
 
   return (
     <Show
@@ -146,15 +146,15 @@ export function RegistrationBanner() {
           </div>
           <Show
             when={current().competitionStatus === "NONE"}
-            fallback={
-              <button
-                class="btn btn-outline-red"
-                disabled={busy()}
-                onClick={withdraw}
-              >
-                {current().competitionStatus === "PLAYER" ? "退赛" : "取消报名"}
-              </button>
-            }
+            // fallback={
+            //   <button
+            //     class="btn btn-outline-red"
+            //     disabled={busy()}
+            //     onClick={withdraw}
+            //   >
+            //     {current().competitionStatus === "PLAYER" ? "退赛" : "取消报名"}
+            //   </button>
+            // }
           >
             <button
               class="btn btn-solid-green"
