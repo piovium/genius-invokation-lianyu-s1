@@ -16,7 +16,7 @@
 import type { Deck } from "@gi-tcg/typings";
 import {
   AssetsManager,
-  DEFAULT_ASSETS_API_ENDPOINT,
+  DEFAULT_STATIC_DATA_API_BASE_URL,
   DEFAULT_ASSETS_MANAGER,
   type AnyData,
   type AssetsManagerOption,
@@ -88,7 +88,7 @@ const [gameData, amOptions] = customDataLoader.done();
 
 export const ASSETS_MANAGER_OPTIONS: Partial<AssetsManagerOption> = {
   ...amOptions,
-  apiEndpoint: DEFAULT_ASSETS_API_ENDPOINT,
+  apiBaseUrl: DEFAULT_STATIC_DATA_API_BASE_URL,
   language: "CHS",
   overrideData: [...(amOptions.overrideData ?? []), ...MATCH_CONFIG.overrides],
   version: versionResolver.versionMap,
@@ -103,7 +103,7 @@ export const GAME_VERSION_BEHAVIOR: VersionBehavior = {
 export const ASSETS_MANAGER = new AssetsManager({
   ...ASSETS_MANAGER_OPTIONS,
   // server-side only override
-  apiEndpoint: process.env.SERVER_ASSETS_API_ENDPOINT || DEFAULT_ASSETS_API_ENDPOINT,
+  apiBaseUrl: process.env.SERVER_STATIC_DATA_API_BASE_URL || DEFAULT_STATIC_DATA_API_BASE_URL,
 });
 
 ASSETS_MANAGER.prepareForSync();
@@ -209,18 +209,6 @@ export async function verifyDeck(deck: Deck): Promise<Version> {
     }
   }
   return CURRENT_VERSION;
-}
-
-function maxVersion(versions: Iterable<string | null>): Version {
-  const ver = [...versions]
-    .filter((v): v is string => !!v)
-    .toSorted(semverCompare)
-    .at(-1);
-  if (!VERSIONS.includes(ver as Version)) {
-    return CURRENT_VERSION;
-  } else {
-    return ver as Version;
-  }
 }
 
 export async function minimumRequiredVersionOfDeck(_: Deck): Promise<Version> {
