@@ -1,6 +1,6 @@
 import {
   AssetsManager,
-  DEFAULT_ASSETS_API_ENDPOINT,
+  DEFAULT_STATIC_DATA_API_BASE_URL,
   type AssetsManagerOption,
   type OverrideData,
 } from "@gi-tcg/assets-manager";
@@ -40,7 +40,7 @@ export const GAME_VERSION_BEHAVIOR: VersionBehavior = {
 };
 export const ASSETS_MANAGER_OPTIONS: Partial<AssetsManagerOption> = {
   ...assetsManagerOptions,
-  apiEndpoint: DEFAULT_ASSETS_API_ENDPOINT,
+  apiBaseUrl: DEFAULT_STATIC_DATA_API_BASE_URL,
   language: "CHS",
   overrideData: [
     ...(assetsManagerOptions.overrideData ?? []),
