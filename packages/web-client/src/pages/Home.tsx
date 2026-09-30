@@ -37,6 +37,7 @@ import { useI18n } from "../i18n";
 import { Portal } from "solid-js/web";
 import { RegistrationBanner } from "../competition/RegistrationBanner";
 import { MyMatches } from "../competition/MyMatches";
+import { Advertisement } from "../components/Advertisement";
 import { errorMessage } from "../api/errors";
 
 export default function Home() {
@@ -223,6 +224,7 @@ export default function Home() {
                 <div class="b-r-gray-200 b-1 hidden md:block mr-8" />
                 <div class="flex-grow flex flex-col md:min-w-128">
                   <RegistrationBanner />
+                  <Advertisement />
                   <div class="hidden md:block">
                     <MyMatches />
                   </div>
