@@ -9,5 +9,6 @@ RUN pnpm install --frozen-lockfile && pnpm build:no-typing server...
 FROM node:26 AS deploy
 WORKDIR /app/packages/server
 COPY --from=build /app/packages/server/dist/* /app/packages/server/prisma /app/packages/server/prisma.config.ts ./
+RUN npm install @node-rs/argon2
 
 CMD ["node", "--experimental-vm-modules", "--enable-source-maps", "main.js"]
