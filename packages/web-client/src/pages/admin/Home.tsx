@@ -31,7 +31,7 @@ export default function AdminHome() {
           <p>进行中场次</p>
         </div>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-6">
         <A class="btn btn-outline-primary h-14" href="/admin/users">
           用户与报名设置
         </A>
@@ -40,6 +40,9 @@ export default function AdminHome() {
         </A>
         <A class="btn btn-outline-primary h-14" href="/admin/statistics">
           业务统计
+        </A>
+        <A class="btn btn-outline-primary h-14" href="/admin/results">
+          比赛结果
         </A>
         <A class="btn btn-outline-primary h-14" href="/admin/audit-logs">
           审计日志

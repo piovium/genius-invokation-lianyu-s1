@@ -43,6 +43,7 @@ const AdminEventEditor = lazy(() => import("./pages/admin/EventEditor"));
 const AdminEvent = lazy(() => import("./pages/admin/Event"));
 const AdminMatch = lazy(() => import("./pages/admin/Match"));
 const AdminStatistics = lazy(() => import("./pages/admin/Statistics"));
+const AdminResults = lazy(() => import("./pages/admin/Results"));
 const AdminAuditLogs = lazy(() => import("./pages/admin/AuditLogs"));
 
 export interface VersionContextValue {
@@ -96,6 +97,7 @@ function App() {
             <Route path="/admin/events/:id" component={AdminEvent} />
             <Route path="/admin/matches/:id" component={AdminMatch} />
             <Route path="/admin/statistics" component={AdminStatistics} />
+            <Route path="/admin/results" component={AdminResults} />
             <Route path="/admin/audit-logs" component={AdminAuditLogs} />
             <Route path="*" component={NotFound} />
           </Router>

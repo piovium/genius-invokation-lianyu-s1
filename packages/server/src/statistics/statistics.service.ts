@@ -646,4 +646,96 @@ export class StatisticsService {
     );
     return rankings.map((item, index) => ({ rank: index + 1, ...item }));
   }
+
+  async results(eventIds: number[]) {
+    const [rankings, selectedEvents] = await Promise.all([
+      this.rankings(eventIds),
+      this.prisma.tournamentEvent.findMany({
+        where: { id: { in: eventIds } },
+        select: {
+          id: true,
+          name: true,
+          matches: {
+            select: {
+              winnerUserId: true,
+              participants: {
+                select: {
+                  user: {
+                    select: {
+                      id: true,
+                      qq: true,
+                      name: true,
+                      competitionStatus: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    const eventsById = new Map(selectedEvents.map((event) => [event.id, event]));
+    const events = eventIds.flatMap((id) => {
+      const event = eventsById.get(id);
+      return event ? [{ id: event.id, name: event.name }] : [];
+    });
+    const users = new Map<
+      number,
+      {
+        id: number;
+        qq: string;
+        name: string;
+        competitionStatus: string;
+        results: Record<number, 0 | 1>;
+      }
+    >();
+    for (const event of selectedEvents) {
+      for (const match of event.matches) {
+        for (const participant of match.participants) {
+          const user = participant.user;
+          const item = users.get(user.id) ?? { ...user, results: {} };
+          const result = match.winnerUserId === user.id ? 1 : 0;
+          item.results[event.id] = Math.max(
+            item.results[event.id] ?? 0,
+            result,
+          ) as 0 | 1;
+          users.set(user.id, item);
+        }
+      }
+    }
+    const rankingsByUserId = new Map(
+      rankings.map((ranking) => [ranking.userId, ranking]),
+    );
+    return {
+      events,
+      rows: [...users.values()]
+        .map((user) => {
+          const ranking = rankingsByUserId.get(user.id);
+          return {
+            ...user,
+            rank: ranking?.rank ?? null,
+            played: ranking?.played ?? 0,
+            won: ranking?.won ?? 0,
+            opponents: ranking?.opponents ?? [],
+            tieBreak: ranking?.tieBreak ?? {
+              numerator: 0,
+              denominator: 0,
+              value: 0,
+            },
+            secondTieBreak: ranking?.secondTieBreak ?? {
+              numerator: 0,
+              denominator: 0,
+              value: 0,
+              opponents: [],
+            },
+          };
+        })
+        .sort(
+          (a, b) =>
+            (a.rank ?? Number.MAX_SAFE_INTEGER) -
+              (b.rank ?? Number.MAX_SAFE_INTEGER) || a.id - b.id,
+        ),
+    };
+  }
 }

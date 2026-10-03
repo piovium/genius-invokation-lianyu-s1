@@ -153,4 +153,9 @@ export class StatisticsController {
   rankings(@Body() { eventIds }: RankingsDto) {
     return this.statistics.rankings(eventIds);
   }
+
+  @Post("results/preview")
+  results(@Body() { eventIds }: RankingsDto) {
+    return this.statistics.results(eventIds);
+  }
 }

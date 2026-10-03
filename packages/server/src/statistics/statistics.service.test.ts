@@ -515,4 +515,68 @@ describe("StatisticsService filters", () => {
     ]);
     expect(findMany.mock.calls[0]![0].select).not.toHaveProperty("stateLog");
   });
+
+  it("returns the selected event participant union and per-event results", async () => {
+    const users = [
+      {
+        id: 7,
+        qq: "10007",
+        name: "Player 7",
+        competitionStatus: "PLAYER",
+      },
+      {
+        id: 8,
+        qq: "10008",
+        name: "Player 8",
+        competitionStatus: "NONE",
+      },
+    ];
+    const service = new StatisticsService({
+      tournamentMatch: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            eventId: 3,
+            winnerUserId: 7,
+            maxGames: 1,
+            games: [{ id: 1 }],
+            participants: [{ userId: 7 }, { userId: 8 }],
+          },
+        ]),
+      },
+      tournamentEvent: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: 3,
+            name: "Round 1",
+            matches: [
+              {
+                winnerUserId: 7,
+                participants: users.map((user) => ({ user })),
+              },
+            ],
+          },
+        ]),
+      },
+    } as never);
+
+    const result = await service.results([3]);
+
+    expect(result.events).toEqual([{ id: 3, name: "Round 1" }]);
+    expect(result.rows).toEqual([
+      expect.objectContaining({
+        id: 7,
+        rank: 1,
+        won: 1,
+        competitionStatus: "PLAYER",
+        results: { 3: 1 },
+      }),
+      expect.objectContaining({
+        id: 8,
+        rank: 2,
+        won: 0,
+        competitionStatus: "NONE",
+        results: { 3: 0 },
+      }),
+    ]);
+  });
 });
