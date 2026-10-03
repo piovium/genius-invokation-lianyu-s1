@@ -1,4 +1,4 @@
-import { For } from "solid-js";
+import { For, type JSX } from "solid-js";
 
 export interface StatisticsSortOption<T extends string> {
   value: T;
@@ -10,6 +10,7 @@ export function StatisticsListToolbar<T extends string>(props: {
   searchPlaceholder: string;
   sort: T;
   sortOptions: readonly StatisticsSortOption<T>[];
+  actions?: JSX.Element;
   onSearch: (value: string) => void;
   onSort: (value: T) => void;
 }) {
@@ -29,7 +30,7 @@ export function StatisticsListToolbar<T extends string>(props: {
           onInput={(event) => props.onSearch(event.currentTarget.value)}
         />
       </label>
-      <label class="flex shrink-0 items-center gap-2 text-sm">
+      <label class="flex shrink-0 items-center gap-2 text-sm ml-auto">
         <span class="text-gray-5">按</span>
         <select
           class="h-10 rounded-lg b b-gray-3 bg-white px-3 outline-none focus:b-primary"
@@ -44,6 +45,7 @@ export function StatisticsListToolbar<T extends string>(props: {
         </select>
         <span class="text-gray-5">降序</span>
       </label>
+      {props.actions}
     </div>
   );
 }

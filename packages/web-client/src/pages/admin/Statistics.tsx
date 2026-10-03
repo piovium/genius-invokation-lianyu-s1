@@ -12,6 +12,11 @@ import { StatisticsActionCard } from "../../components/StatisticsActionCard";
 import { StatisticsUserCard } from "../../components/StatisticsUserCard";
 import { StatisticsCombinationCard } from "../../components/StatisticsCombinationCard";
 import { StatisticsListToolbar } from "../../components/StatisticsListToolbar";
+import {
+  exportCombinationStatisticsPoster,
+  type CombinationStatisticsPosterItem,
+} from "../../components/CombinationStatisticsPoster";
+import { errorMessage } from "../../api/errors";
 
 type Source = "tournament" | "casual";
 type Tab = "characters" | "actionCards" | "combinations" | "users";
@@ -127,6 +132,7 @@ export default function Statistics() {
     string | null
   >(null);
   const [selectedUser, setSelectedUser] = createSignal<number | null>(null);
+  const [exportingCombinations, setExportingCombinations] = createSignal(false);
   const [searches, setSearches] = createSignal<Record<Tab, string>>({
     characters: "",
     actionCards: "",
@@ -272,6 +278,26 @@ export default function Statistics() {
       sortFields().combinations as AggregateSortField,
     );
   });
+  const exportCombinations = async () => {
+    const data = overview();
+    if (!data?.combinations.length) return;
+    setExportingCombinations(true);
+    try {
+      await exportCombinationStatisticsPoster(
+        data.combinations.map((item) => ({
+          ...item,
+          awayAppearances: item.awayAppearances ?? 0,
+          awayWinRate: item.awayWinRate ?? 0,
+        })) satisfies CombinationStatisticsPosterItem[],
+        data.gameCount,
+        assetsManager(),
+      );
+    } catch (reason) {
+      alert(errorMessage(reason));
+    } finally {
+      setExportingCombinations(false);
+    }
+  };
   const userRows = createMemo(() => {
     const search = query(searches().users);
     const field = sortFields().users as UserSortField;
@@ -571,6 +597,22 @@ export default function Statistics() {
           }
           onSort={(value) =>
             setSortFields((current) => ({ ...current, [tab()]: value }))
+          }
+          actions={
+            <Show when={tab() === "combinations"}>
+              <button
+                type="button"
+                class="btn btn-outline-primary h-10 shrink-0"
+                disabled={
+                  exportingCombinations() || !overview()?.combinations.length
+                }
+                onClick={() => void exportCombinations()}
+              >
+                <span class="hidden sm:inline">
+                  {exportingCombinations() ? "正在生成…" : "导出预览图"}
+                </span>
+              </button>
+            </Show>
           }
         />
         <Show
