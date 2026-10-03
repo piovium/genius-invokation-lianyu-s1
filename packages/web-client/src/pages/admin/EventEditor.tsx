@@ -102,6 +102,17 @@ export default function EventEditor() {
     else setSide1([...side1(), ...fresh]);
     setChecked([]);
   };
+  const selectByPosition = (parity: 0 | 1) =>
+    setChecked(
+      candidates()
+        .filter(
+          (user, index) =>
+            index % 2 === parity &&
+            !side0().includes(user.id) &&
+            !side1().includes(user.id),
+        )
+        .map((user) => user.id),
+    );
   const remove = (side: 0 | 1, id: number) =>
     side === 0
       ? setSide0(side0().filter((x) => x !== id))
@@ -433,6 +444,20 @@ export default function EventEditor() {
               }
             >
               全选当前结果
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              onClick={() => selectByPosition(0)}
+            >
+              全选奇数位置
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              onClick={() => selectByPosition(1)}
+            >
+              全选偶数位置
             </button>
             <button
               type="button"
