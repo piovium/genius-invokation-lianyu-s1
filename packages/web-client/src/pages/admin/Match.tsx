@@ -16,6 +16,7 @@ import type {
 import type { DeckInfo } from "../Decks";
 import { errorMessage } from "../../api/errors";
 import { ToggleSwitch } from "../../components/ToggleSwitch";
+import { exportMatchDeckPoster } from "../../components/MatchDeckPoster";
 import { useI18n } from "../../i18n";
 import {
   AdminPage,
@@ -172,6 +173,7 @@ export default function AdminMatch() {
   const [winnerError, setWinnerError] = createSignal("");
   const [editingMatch, setEditingMatch] = createSignal(false);
   const [editError, setEditError] = createSignal("");
+  const [exportingPoster, setExportingPoster] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const participantName = (userId: number | null) =>
     match()?.participants.find((participant) => participant.userId === userId)
@@ -303,6 +305,19 @@ export default function AdminMatch() {
     link.click();
     URL.revokeObjectURL(url);
   };
+  const exportDeckPoster = async () => {
+    const data = match();
+    if (!data) return;
+    setExportingPoster(true);
+    setMessage("");
+    try {
+      await exportMatchDeckPoster(data, assetsManager());
+    } catch (reason) {
+      setMessage(errorMessage(reason));
+    } finally {
+      setExportingPoster(false);
+    }
+  };
 
   return (
     <AdminPage
@@ -316,6 +331,13 @@ export default function AdminMatch() {
       ]}
       actions={
         <div class="flex flex-wrap gap-2">
+          <button
+            class="btn btn-outline-primary"
+            disabled={!match() || exportingPoster()}
+            onClick={() => void exportDeckPoster()}
+          >
+            {exportingPoster() ? "正在生成…" : "导出比赛牌组"}
+          </button>
           <button
             class="btn btn-outline"
             disabled={!match() || match()?.event?.phase === "FINISHED"}
